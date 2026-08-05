@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance, useSwitchChain } from "wagmi";
 import { parseUnits } from "viem";
 import {
   CONTRACTS,
@@ -16,10 +16,20 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string
  * Hook for UmbraOrgFactory interactions on Coston2 coordination chain.
  */
 export function useOrganizationFactory() {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const { writeContract, isPending, isSuccess, data: hash } = useWriteContract();
 
-  const createOrganization = (name: string, teeVaultAddress: `0x${string}` = CONTRACTS.teeVault) => {
+  const createOrganization = async (name: string, teeVaultAddress: `0x${string}` = CONTRACTS.teeVault) => {
+    if (chainId !== 114) {
+      try {
+        await switchChainAsync({ chainId: 114 });
+      } catch (err) {
+        console.error("Failed to switch network to Coston2:", err);
+        return;
+      }
+    }
+
     writeContract({
       address: CONTRACTS.organizationFactory,
       abi: UMBRA_ORG_FACTORY_ABI,
