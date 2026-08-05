@@ -1,19 +1,39 @@
 # Root-level ignores
+
+# Dependencies
 node_modules/
-.DS_Store
-*.log
+frontend/node_modules/
+contract/node_modules/
+
+# Next.js & Build Output
+.next/
+frontend/.next/
+out/
+frontend/out/
+build/
+frontend/build/
+contract/artifacts/
+contract/cache/
+contract/typechain-types/
+
+# Environment Variables & Secrets
 .env
 .env.*
-.claude/
+!.env.example
+*.pem
+
+# Debug & Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Vercel & IDE Tooling
+.vercel/
+frontend/.vercel/
+.DS_Store
+*.tsbuildinfo
 .idea/
 .vscode/
-/.next/
-.next/
-
-# Ignore frontend build files and dependencies if needed globally,
-# though they're already in their own .gitignore.
-# Adding them here for redundancy and root-level clarity.
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/build/
+.claude/
