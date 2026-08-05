@@ -34,6 +34,54 @@ Instead of heavy, slow homomorphic operations or complex keypair re-encryption, 
 
 ---
 
+## System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["Frontend Interface (Next.js 16 / Wagmi v2)"]
+        Employer["Employer Dashboard"]
+        Employee["Employee Portal"]
+    end
+
+    subgraph CoordinationChain["Flare Coston2 Testnet (Chain ID 114)"]
+        Factory["UmbraOrgFactory Contract"]
+        OrgContract["UmbraOrg Contract"]
+    end
+
+    subgraph ConfidentialCompute["Flare Confidential Compute (TEE Enclave)"]
+        EnclaveAPI["TEE Enclave Engine (/api/enclave)"]
+        EnclaveLedger["Confidential State & Encrypted Ledger"]
+        EnclaveSigner["TEE Enclave Key Signer"]
+    end
+
+    subgraph SettlementChain["Ethereum Sepolia (Chain ID 11155111)"]
+        SepoliaVault["TEE Settlement Vault (0x294d...1185)"]
+        EmployeeWallet["Employee Sepolia Wallet"]
+    end
+
+    Employer -- "1. Create Org" --> Factory
+    Factory -- "Deploys" --> OrgContract
+    Employer -- "2. Add Employee / Salary" --> OrgContract
+    OrgContract -- "Sync Payload" --> EnclaveAPI
+    Employer -- "3. Deposit Native ETH" --> SepoliaVault
+    Employer -- "4. Run Payroll Batch" --> OrgContract
+    OrgContract -- "Trigger Allocation" --> EnclaveAPI
+    EnclaveAPI --> EnclaveLedger
+
+    Employee -- "5. EIP-712 Decrypt Balance" --> EnclaveAPI
+    Employee -- "6. Request Withdrawal" --> OrgContract
+    OrgContract -- "Verify & Attest" --> EnclaveSigner
+    EnclaveSigner -- "7. Signed ETH Payout" --> SepoliaVault
+    SepoliaVault -- "Disburse Native ETH" --> EmployeeWallet
+
+    style Client fill:#09090b,stroke:#00e5a0,color:#fff
+    style CoordinationChain fill:#111,stroke:#ff4b4b,color:#fff
+    style ConfidentialCompute fill:#0c1612,stroke:#00e5a0,color:#fff
+    style SettlementChain fill:#111,stroke:#627eea,color:#fff
+```
+
+---
+
 ## How It Works
 
 ```
@@ -97,7 +145,7 @@ Employer                          Coston2 / TEE Enclave                   Employ
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/martinvibes/DripPay.git UmbraPay
+git clone https://github.com/Ultraviolet01/Umbra-Pay.git UmbraPay
 cd UmbraPay
 
 # Install contract dependencies
