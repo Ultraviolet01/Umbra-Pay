@@ -21,7 +21,7 @@ export function Footer() {
         </div>
 
         <p className="text-xs text-[var(--text-muted)]">
-          &copy; 2026 DripPay. Built for PL Genesis Hackathon.
+          &copy; 2026 Umbra Pay. Built with Flare Confidential Compute.
         </p>
       </div>
     </footer>

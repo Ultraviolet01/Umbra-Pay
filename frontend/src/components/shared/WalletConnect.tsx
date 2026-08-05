@@ -7,7 +7,7 @@ interface WalletConnectProps {
 }
 
 /**
- * Custom-styled RainbowKit connect button that matches DripPay's design.
+ * Custom-styled RainbowKit connect button that matches Umbra Pay's design.
  * Uses RainbowKit's custom render for full control over appearance.
  */
 export function WalletConnect({ compact = false }: WalletConnectProps) {

@@ -19,9 +19,9 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "DripPay — Private Payroll, Onchain",
+  title: "Umbra Pay — Private Payroll, Onchain",
   description:
-    "End-to-end encrypted payroll powered by Fully Homomorphic Encryption. Nobody sees what you earn not even the blockchain.",
+    "Confidential on-chain payroll powered by Flare Confidential Compute (FCC) TEEs. Nobody sees what you earn.",
   icons: { icon: "/icon.svg" },
 };
 

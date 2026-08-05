@@ -1,32 +1,31 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from "wagmi";
+import { parseUnits } from "viem";
 import {
   CONTRACTS,
-  ORGANIZATION_FACTORY_ABI,
-  ORGANIZATION_ABI,
+  UMBRA_ORG_FACTORY_ABI,
+  UMBRA_ORG_ABI,
   isContractsDeployed,
 } from "@/lib/contracts";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 /**
- * Hook for organization factory interactions.
- *
- * - Create new organizations
- * - Fetch user's organizations
+ * Hook for UmbraOrgFactory interactions on Coston2 coordination chain.
  */
 export function useOrganizationFactory() {
   const { address } = useAccount();
   const { writeContract, isPending, isSuccess, data: hash } = useWriteContract();
 
-  const createOrganization = (name: string, paymentToken: `0x${string}` = ZERO_ADDRESS) => {
+  const createOrganization = (name: string, teeVaultAddress: `0x${string}` = CONTRACTS.teeVault) => {
     writeContract({
       address: CONTRACTS.organizationFactory,
-      abi: ORGANIZATION_FACTORY_ABI,
+      abi: UMBRA_ORG_FACTORY_ABI,
       functionName: "createOrg",
-      args: [name, paymentToken],
+      args: [name, teeVaultAddress],
+      gas: 3000000n,
     });
   };
 
@@ -36,7 +35,7 @@ export function useOrganizationFactory() {
     refetch: refetchOrgs,
   } = useReadContract({
     address: CONTRACTS.organizationFactory,
-    abi: ORGANIZATION_FACTORY_ABI,
+    abi: UMBRA_ORG_FACTORY_ABI,
     functionName: "getOrganizations",
     args: address ? [address] : undefined,
     query: { enabled: !!address && isContractsDeployed },
@@ -54,8 +53,7 @@ export function useOrganizationFactory() {
 }
 
 /**
- * Hook for fetching organizations an employee belongs to.
- * Uses the factory's getEmployeeOrganizations(address) view.
+ * Hook for fetching organizations an employee belongs to on Coston2.
  */
 export function useEmployeeOrganizations() {
   const { address } = useAccount();
@@ -66,7 +64,7 @@ export function useEmployeeOrganizations() {
     refetch: refetchEmployeeOrgs,
   } = useReadContract({
     address: CONTRACTS.organizationFactory,
-    abi: ORGANIZATION_FACTORY_ABI,
+    abi: UMBRA_ORG_FACTORY_ABI,
     functionName: "getEmployeeOrganizations",
     args: address ? [address] : undefined,
     query: { enabled: !!address && isContractsDeployed },
@@ -80,12 +78,7 @@ export function useEmployeeOrganizations() {
 }
 
 /**
- * Hook for single organization interactions.
- *
- * - Add/remove employees
- * - Run payroll
- * - Deposit tokens
- * - Read org data (including paymentToken, contractBalance, createdAt)
+ * Hook for single UmbraOrg interactions on Coston2 coordination chain.
  */
 export function useOrganization(orgAddress?: `0x${string}`) {
   const { writeContract, isPending, data: txHash, reset: resetTx } = useWriteContract();
@@ -95,26 +88,32 @@ export function useOrganization(orgAddress?: `0x${string}`) {
     reset: resetRemove,
   } = useWriteContract();
 
-  // Track which specific employee address is being removed
   const [removingAddress, setRemovingAddress] = useState<`0x${string}` | null>(null);
 
-  // Wait for remove tx to confirm on-chain
   const { isSuccess: isRemoveConfirmed } = useWaitForTransactionReceipt({
     hash: removeTxHash,
     query: { enabled: !!removeTxHash },
   });
 
-  const addEmployees = (
-    employees: `0x${string}`[],
-    encryptedSalaries: `0x${string}`[],
-    proof: `0x${string}`
-  ) => {
+  const addEmployee = (employee: `0x${string}`, encryptedSalary: `0x${string}`) => {
     if (!orgAddress) return;
     writeContract({
       address: orgAddress,
-      abi: ORGANIZATION_ABI,
+      abi: UMBRA_ORG_ABI,
+      functionName: "addEmployee",
+      args: [employee, encryptedSalary],
+      gas: 500000n,
+    });
+  };
+
+  const addEmployees = (employees: `0x${string}`[], encryptedSalaries: `0x${string}`[]) => {
+    if (!orgAddress) return;
+    writeContract({
+      address: orgAddress,
+      abi: UMBRA_ORG_ABI,
       functionName: "addEmployees",
-      args: [employees, encryptedSalaries, proof],
+      args: [employees, encryptedSalaries],
+      gas: 1000000n,
     });
   };
 
@@ -124,9 +123,10 @@ export function useOrganization(orgAddress?: `0x${string}`) {
     writeRemove(
       {
         address: orgAddress,
-        abi: ORGANIZATION_ABI,
+        abi: UMBRA_ORG_ABI,
         functionName: "removeEmployee",
         args: [employee],
+        gas: 300000n,
       },
       {
         onError: () => setRemovingAddress(null),
@@ -138,108 +138,94 @@ export function useOrganization(orgAddress?: `0x${string}`) {
     if (!orgAddress) return;
     writeContract({
       address: orgAddress,
-      abi: ORGANIZATION_ABI,
+      abi: UMBRA_ORG_ABI,
       functionName: "runPayroll",
+      gas: 500000n,
     });
   };
 
-  const withdraw = (amount: bigint) => {
+  const updateSalary = (employee: `0x${string}`, newEncryptedSalary: `0x${string}`) => {
     if (!orgAddress) return;
     writeContract({
       address: orgAddress,
-      abi: ORGANIZATION_ABI,
-      functionName: "withdraw",
-      args: [amount],
-    });
-  };
-
-  const deposit = (amount: bigint, isETH: boolean) => {
-    if (!orgAddress) return;
-    if (isETH) {
-      writeContract({
-        address: orgAddress,
-        abi: ORGANIZATION_ABI,
-        functionName: "deposit",
-        args: [BigInt(0)],
-        value: amount,
-      });
-    } else {
-      writeContract({
-        address: orgAddress,
-        abi: ORGANIZATION_ABI,
-        functionName: "deposit",
-        args: [amount],
-      });
-    }
-  };
-
-  const updateSalary = (
-    employee: `0x${string}`,
-    encryptedSalary: `0x${string}`,
-    proof: `0x${string}`
-  ) => {
-    if (!orgAddress) return;
-    writeContract({
-      address: orgAddress,
-      abi: ORGANIZATION_ABI,
+      abi: UMBRA_ORG_ABI,
       functionName: "updateSalary",
-      args: [employee, encryptedSalary, proof],
+      args: [employee, newEncryptedSalary],
+      gas: 500000n,
     });
   };
 
-  // Read org data
+  const requestWithdrawal = (amountWei: bigint, sepoliaRecipient: `0x${string}`) => {
+    if (!orgAddress) return;
+    writeContract({
+      address: orgAddress,
+      abi: UMBRA_ORG_ABI,
+      functionName: "requestWithdrawal",
+      args: [amountWei, sepoliaRecipient],
+      gas: 500000n,
+    });
+  };
+
+  const deposit = (amountEth: string) => {
+    fetch("/api/enclave", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "deposit",
+        depositAmountEth: amountEth,
+      }),
+    });
+  };
+
   const { data: orgName } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
+    abi: UMBRA_ORG_ABI,
     functionName: "name",
     query: { enabled: !!orgAddress },
   });
 
   const { data: employees, refetch: refetchEmployees } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
+    abi: UMBRA_ORG_ABI,
     functionName: "getEmployees",
     query: { enabled: !!orgAddress },
   });
 
   const { data: adminAddress } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
+    abi: UMBRA_ORG_ABI,
     functionName: "admin",
     query: { enabled: !!orgAddress },
   });
 
-  const { data: paymentToken } = useReadContract({
+  const { data: teeVaultAddress } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
-    functionName: "paymentToken",
-    query: { enabled: !!orgAddress },
-  });
-
-  const { data: contractBalance, refetch: refetchBalance } = useReadContract({
-    address: orgAddress,
-    abi: ORGANIZATION_ABI,
-    functionName: "getContractBalance",
+    abi: UMBRA_ORG_ABI,
+    functionName: "teeVaultAddress",
     query: { enabled: !!orgAddress },
   });
 
   const { data: createdAt } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
+    abi: UMBRA_ORG_ABI,
     functionName: "createdAt",
     query: { enabled: !!orgAddress },
   });
 
   const { data: payrollRunCount } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
+    abi: UMBRA_ORG_ABI,
     functionName: "payrollRunCount",
     query: { enabled: !!orgAddress },
   });
 
-  const isETH = !paymentToken || paymentToken === ZERO_ADDRESS;
+  const { data: vaultBalanceData, refetch: refetchBalance } = useBalance({
+    address: CONTRACTS.teeVault,
+    chainId: 11155111,
+  });
 
-  // When remove tx confirms on-chain, refetch employees and clear state
+  const contractBalance = vaultBalanceData ? vaultBalanceData.value : 0n;
+
   useEffect(() => {
     if (isRemoveConfirmed && removingAddress) {
       refetchEmployees();
@@ -250,20 +236,22 @@ export function useOrganization(orgAddress?: `0x${string}`) {
   }, [isRemoveConfirmed]);
 
   return {
+    addEmployee,
     addEmployees,
     removeEmployee,
     runPayroll,
-    withdraw,
-    deposit,
     updateSalary,
+    requestWithdrawal,
+    deposit,
+    paymentToken: ZERO_ADDRESS,
+    contractBalance,
+    isETH: true,
     orgName: orgName as string | undefined,
     employees: (employees as `0x${string}`[] | undefined) ?? [],
     adminAddress: adminAddress as `0x${string}` | undefined,
-    paymentToken: paymentToken as `0x${string}` | undefined,
-    contractBalance: contractBalance as bigint | undefined,
+    teeVaultAddress: (teeVaultAddress as `0x${string}` | undefined) || CONTRACTS.teeVault,
     createdAt: createdAt as bigint | undefined,
     payrollRunCount: payrollRunCount as bigint | undefined,
-    isETH,
     isPending,
     removingAddress,
     txHash,

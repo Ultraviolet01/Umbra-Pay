@@ -1,17 +1,17 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Lock, Zap, EyeOff, Sparkles, Eye } from "lucide-react";
+import { Shield, Lock, Zap, EyeOff, Eye } from "lucide-react";
 import { fadeUp, stagger } from "@/lib/animations";
 import { useState, useEffect } from "react";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const SECURITY_POINTS = [
-  { icon: Lock, text: "Salaries encrypted with TFHE before reaching the chain" },
-  { icon: Zap, text: "Computations performed entirely on ciphertext" },
-  { icon: EyeOff, text: "Only the employee's wallet can decrypt their balance" },
-  { icon: Shield, text: "Zero plaintext exposure - ever" },
+  { icon: Lock, text: "Salaries calculated confidentially inside Flare TEE Enclave" },
+  { icon: Zap, text: "Coston2 coordination chain stores encrypted state payloads" },
+  { icon: EyeOff, text: "Only authorized employee wallet signatures decrypt balance queries" },
+  { icon: Shield, text: "Native ETH payout settlement signed directly by TEE Enclave on Sepolia" },
 ];
 
 export function SecuritySection() {
@@ -31,7 +31,7 @@ export function SecuritySection() {
               custom={0}
               className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-[var(--accent)]"
             >
-              Advanced Privacy
+              Advanced TEE Privacy
             </motion.p>
             <motion.h2
               variants={fadeUp}
@@ -39,10 +39,10 @@ export function SecuritySection() {
               className="mb-5 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Your Numbers,
+              Confidential Payroll,
               <br />
               <span className="text-[var(--text-secondary)]">
-                Nobody Else&apos;s Eyes.
+                On-Chain Verification.
               </span>
             </motion.h2>
             <motion.p
@@ -50,9 +50,7 @@ export function SecuritySection() {
               custom={2}
               className="mb-10 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]"
             >
-              Using Zama&apos;s Fully Homomorphic Encryption, we process
-              payments while the amounts stay hidden from the entire world -
-              even from the blockchain itself.
+              Using Flare Confidential Compute (FCC) TEE Enclaves, payroll calculations and balance state remain completely private. Native ETH payouts are settled securely on Ethereum Sepolia.
             </motion.p>
 
             <motion.div variants={fadeUp} custom={3} className="space-y-4">
@@ -84,7 +82,7 @@ export function SecuritySection() {
   );
 }
 
-/** A much more impressive encryption flow visualization */
+/** Encryption & TEE Attestation Flow Visualization */
 function EncryptionFlow() {
   const [stage, setStage] = useState(0);
 
@@ -96,10 +94,10 @@ function EncryptionFlow() {
   }, []);
 
   const stages = [
-    { label: "Plaintext Input", sub: "Salary data entered by employer", icon: Eye, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
-    { label: "FHE Encryption", sub: "Client-side TFHE encryption", icon: Lock, color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20" },
-    { label: "On-chain Compute", sub: "Math on encrypted ciphertext", icon: Zap, color: "text-[var(--accent)]", bg: "bg-[rgba(0,229,160,0.1)]", border: "border-[rgba(0,229,160,0.2)]" },
-    { label: "Private Result", sub: "Only employee can decrypt", icon: Shield, color: "text-[var(--accent)]", bg: "bg-[rgba(0,229,160,0.1)]", border: "border-[rgba(0,229,160,0.2)]" },
+    { label: "Encrypted Input", sub: "Payload stored on Coston2 (114)", icon: Eye, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
+    { label: "TEE Compute", sub: "Flare Confidential Compute Enclave", icon: Lock, color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20" },
+    { label: "Solvency Proof", sub: "Signed TEE attestation audit proof", icon: Zap, color: "text-[var(--accent)]", bg: "bg-[rgba(0,229,160,0.1)]", border: "border-[rgba(0,229,160,0.2)]" },
+    { label: "Sepolia Payout", sub: "Enclave settles native ETH on Sepolia", icon: Shield, color: "text-[var(--accent)]", bg: "bg-[rgba(0,229,160,0.1)]", border: "border-[rgba(0,229,160,0.2)]" },
   ];
 
   const current = stages[stage];
@@ -111,7 +109,6 @@ function EncryptionFlow() {
       viewport={{ once: true, margin: "-100px" }}
       className="relative w-full max-w-md lg:ml-auto"
     >
-      {/* Background glow */}
       <motion.div
         animate={{
           opacity: stage >= 2 ? [0.05, 0.15, 0.05] : [0.02, 0.05, 0.02],
@@ -123,7 +120,6 @@ function EncryptionFlow() {
       />
 
       <div className="relative rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#0a0a0f]/90 backdrop-blur-xl overflow-hidden shadow-[0_8px_60px_rgba(0,0,0,0.4)]">
-        {/* Top accent that changes color */}
         <div
           className={`h-px w-full transition-all duration-700 ${
             stage === 0
@@ -135,7 +131,6 @@ function EncryptionFlow() {
         />
 
         <div className="p-6">
-          {/* Stage indicator dots */}
           <div className="flex items-center gap-2 mb-6">
             {stages.map((_, i) => (
               <motion.div
@@ -150,7 +145,6 @@ function EncryptionFlow() {
             ))}
           </div>
 
-          {/* Central icon */}
           <div className="flex justify-center mb-6">
             <AnimatePresence mode="wait">
               <motion.div
@@ -162,27 +156,10 @@ function EncryptionFlow() {
                 className={`relative flex h-20 w-20 items-center justify-center rounded-2xl ${current.bg} border ${current.border}`}
               >
                 <current.icon className={`h-10 w-10 ${current.color}`} />
-
-                {/* Spinning ring when processing */}
-                {stage === 2 && (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-[-4px] rounded-2xl border border-dashed border-[var(--accent)] opacity-30"
-                  />
-                )}
-
-                {/* Pulse ring */}
-                <motion.div
-                  animate={{ scale: [1, 1.5], opacity: [0.3, 0] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className={`absolute inset-0 rounded-2xl border ${current.border}`}
-                />
               </motion.div>
             </AnimatePresence>
           </div>
 
-          {/* Stage text */}
           <AnimatePresence mode="wait">
             <motion.div
               key={stage}
@@ -199,63 +176,26 @@ function EncryptionFlow() {
             </motion.div>
           </AnimatePresence>
 
-          {/* Data preview */}
           <div className="space-y-2">
-            {["Employee", "Salary", "Balance"].map((field, i) => (
+            {["Employee Payload", "Enclave State", "Sepolia Settlement"].map((field, i) => (
               <div
                 key={field}
                 className="flex items-center justify-between rounded-lg bg-[rgba(255,255,255,0.02)] px-3 py-2"
               >
                 <span className="text-[11px] text-[var(--text-muted)]">{field}</span>
-                <AnimatePresence mode="wait">
-                  {stage === 0 ? (
-                    <motion.span
-                      key="plain"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0, filter: "blur(6px)" }}
-                      className="text-[11px] font-mono text-red-300/70"
-                    >
-                      {["Alice", "$5,000", "$15,000"][i]}
-                    </motion.span>
-                  ) : stage === 1 ? (
-                    <motion.div
-                      key="encrypting"
-                      className="flex gap-0.5"
-                    >
-                      {[...Array(5)].map((_, j) => (
-                        <motion.span
-                          key={j}
-                          animate={{ opacity: [0.15, 0.5, 0.15] }}
-                          transition={{ duration: 0.6, repeat: Infinity, delay: (i + j) * 0.08 }}
-                          className="inline-block h-3 w-1.5 rounded-sm bg-yellow-400"
-                        />
-                      ))}
-                    </motion.div>
-                  ) : (
-                    <motion.span
-                      key="encrypted"
-                      initial={{ opacity: 0, x: 4 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ delay: i * 0.06 }}
-                      className="flex items-center gap-1 text-[11px] font-mono text-[var(--accent)]"
-                    >
-                      <Lock className="h-2.5 w-2.5" />
-                      0x{Math.random().toString(16).slice(2, 10)}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
+                <span className="flex items-center gap-1 text-[11px] font-mono text-[var(--accent)]">
+                  <Lock className="h-2.5 w-2.5" />
+                  0x{Math.random().toString(16).slice(2, 10)}
+                </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-3 border-t border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.01)]">
           <div className="flex items-center justify-between text-[9px]">
-            <span className="text-[var(--text-muted)] font-mono">Zama fhEVM Coprocessor</span>
-            <span className="text-[var(--accent)] font-bold">TFHE-256</span>
+            <span className="text-[var(--text-muted)] font-mono">Flare Confidential Compute (FCC)</span>
+            <span className="text-[var(--accent)] font-bold">TEE Attestation</span>
           </div>
         </div>
       </div>

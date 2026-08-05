@@ -3,40 +3,21 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
-import { useReadContract } from "wagmi";
-import { formatUnits } from "viem";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
-import { useFhevm } from "@/hooks/useFhevm";
 
 interface SalaryCellProps {
   employeeAddress: `0x${string}`;
   orgAddress: `0x${string}`;
-  tokenSymbol?: string;
-  tokenDecimals?: number;
   compact?: boolean;
 }
 
 export function SalaryCell({
   employeeAddress,
-  orgAddress,
-  tokenSymbol = "ETH",
-  tokenDecimals = 18,
   compact = false,
 }: SalaryCellProps) {
   const [revealed, setRevealed] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
   const [salary, setSalary] = useState<string | null>(null);
   const [error, setError] = useState("");
-
-  const { decryptBalance, isReady } = useFhevm();
-
-  const { data: salaryHandle, refetch: refetchHandle } = useReadContract({
-    address: orgAddress,
-    abi: ORGANIZATION_ABI,
-    functionName: "salaryOf",
-    args: [employeeAddress],
-    query: { enabled: !!orgAddress && !!employeeAddress },
-  });
 
   const handleToggle = async () => {
     if (revealed) {
@@ -45,39 +26,29 @@ export function SalaryCell({
       return;
     }
 
-    if (!isReady) {
-      setError("Connect wallet first");
-      return;
-    }
-
     setDecrypting(true);
     setError("");
 
     try {
-      const { data: freshHandle } = await refetchHandle();
-      const handle = (freshHandle ?? salaryHandle) as `0x${string}`;
-
-      if (!handle || handle === "0x0000000000000000000000000000000000000000000000000000000000000000") {
-        setSalary("0");
-        setRevealed(true);
-        setDecrypting(false);
-        return;
-      }
-
-      const result = await decryptBalance(handle, orgAddress);
-      const raw = typeof result === "bigint" ? result : BigInt(String(result));
-      const humanReadable = formatUnits(raw, tokenDecimals);
-      const num = parseFloat(humanReadable);
-      const formatted = num.toLocaleString(undefined, {
-        minimumFractionDigits: num < 1 ? 6 : 2,
-        maximumFractionDigits: num < 1 ? 6 : 2,
+      const res = await fetch("/api/enclave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_balance",
+          employeeAddress,
+        }),
       });
-      setSalary(formatted);
-      setRevealed(true);
+
+      const data = await res.json();
+      if (data.success) {
+        setSalary(data.balanceEth);
+        setRevealed(true);
+      } else {
+        setError(data.error || "Query failed");
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Decryption failed";
-      console.error("[SalaryCell] Decrypt error:", err);
-      setError(message);
+      console.error("[SalaryCell] Query error:", err);
+      setError("TEE Query error");
     } finally {
       setDecrypting(false);
     }
@@ -100,7 +71,7 @@ export function SalaryCell({
               className="flex items-center gap-1"
             >
               <Loader2 className="h-3 w-3 animate-spin text-[var(--accent)]" />
-              <span className="text-[11px] text-[var(--accent)]">Decrypting</span>
+              <span className="text-[11px] text-[var(--accent)]">TEE Query</span>
             </motion.div>
           ) : revealed && salary ? (
             <motion.div
@@ -113,7 +84,7 @@ export function SalaryCell({
               <span className="text-[11px] font-mono font-medium text-[var(--accent)]">
                 {salary}
               </span>
-              <span className="text-[10px] text-[var(--text-muted)]">{tokenSymbol}</span>
+              <span className="text-[10px] text-[var(--text-muted)]">ETH</span>
               <EyeOff className="h-2.5 w-2.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
             </motion.div>
           ) : (
@@ -160,7 +131,7 @@ export function SalaryCell({
             className="flex items-center gap-1.5"
           >
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
-            <span className="text-xs text-[var(--accent)]">Decrypting...</span>
+            <span className="text-xs text-[var(--accent)]">TEE Query...</span>
           </motion.div>
         ) : revealed && salary ? (
           <motion.div
@@ -173,7 +144,7 @@ export function SalaryCell({
             <span className="text-sm font-mono font-semibold text-[var(--accent)]">
               {salary}
             </span>
-            <span className="text-xs text-[var(--text-muted)]">{tokenSymbol}</span>
+            <span className="text-xs text-[var(--text-muted)]">ETH</span>
             <EyeOff className="h-3 w-3 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
           </motion.div>
         ) : (

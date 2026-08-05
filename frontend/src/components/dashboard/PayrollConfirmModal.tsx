@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Lock, Loader2, Check, ExternalLink, PartyPopper } from "lucide-react";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
 import { Modal } from "@/components/shared/Modal";
 import { Confetti } from "@/components/shared/Confetti";
 import { EncryptedValue } from "@/components/shared/EncryptedValue";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
+import { UMBRA_ORG_ABI } from "@/lib/contracts";
 import type { Employee } from "@/lib/mock-data";
 
 interface PayrollConfirmModalProps {
@@ -27,6 +27,8 @@ export function PayrollConfirmModal({
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const { chain } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const { writeContract, data: txHash, isPending, error: writeError, reset: resetWrite } = useWriteContract();
 
   const { isSuccess: isTxConfirmed } = useWaitForTransactionReceipt({
@@ -39,9 +41,20 @@ export function PayrollConfirmModal({
   useEffect(() => {
     if (isTxConfirmed && !isSuccess) {
       setIsSuccess(true);
+      fetch("/api/enclave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "run_payroll",
+          employees: activeEmployees.map((e) => ({
+            address: e.address,
+            salaryEth: e.salaryEth || "0.1",
+          })),
+        }),
+      }).catch((e) => console.error("Enclave payroll sync error:", e));
       onExecute();
     }
-  }, [isTxConfirmed, isSuccess, onExecute]);
+  }, [isTxConfirmed, isSuccess, onExecute, activeEmployees]);
 
   // When user rejects or tx fails, reset to confirm state
   useEffect(() => {
@@ -52,14 +65,23 @@ export function PayrollConfirmModal({
     }
   }, [writeError, isExecuting, resetWrite]);
 
-  const handleExecute = () => {
+  const handleExecute = async () => {
     if (isExecuting) return;
     setIsExecuting(true);
 
+    if (chain?.id !== 114 && switchChainAsync) {
+      try {
+        await switchChainAsync({ chainId: 114 });
+      } catch (switchErr) {
+        console.warn("Chain switch warning:", switchErr);
+      }
+    }
+
     writeContract({
       address: orgAddress,
-      abi: ORGANIZATION_ABI,
+      abi: UMBRA_ORG_ABI,
       functionName: "runPayroll",
+      gas: BigInt(500000),
     });
   };
 
@@ -171,7 +193,7 @@ export function PayrollConfirmModal({
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Encryption</span>
-                <span className="text-xs font-mono font-semibold text-[var(--accent)]">FHE-64</span>
+                <span className="text-xs font-mono font-semibold text-[var(--accent)]">TEE Enclave</span>
               </div>
             </motion.div>
 

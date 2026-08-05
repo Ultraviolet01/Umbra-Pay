@@ -139,9 +139,9 @@ export default function DashboardListPage() {
 
   const [pendingCycleDays, setPendingCycleDays] = useState(30);
 
-  const handleCreateOrg = (name: string, paymentToken: `0x${string}`, payrollCycleDays: number) => {
+  const handleCreateOrg = (name: string, teeVaultAddress: `0x${string}`, payrollCycleDays: number) => {
     setPendingCycleDays(payrollCycleDays);
-    createOrganization(name, paymentToken);
+    createOrganization(name, teeVaultAddress);
   };
 
   return (
@@ -248,7 +248,7 @@ export default function DashboardListPage() {
                 {/* Feature pills */}
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   {[
-                    { icon: Lock, text: "FHE Encrypted" },
+                    { icon: Lock, text: "TEE Protected" },
                     { icon: Users, text: "Batch Payroll" },
                     { icon: Shield, text: "Privacy-first" },
                   ].map((item, i) => (
@@ -378,7 +378,7 @@ export default function DashboardListPage() {
                             <span className="h-3 w-px bg-[var(--border)] hidden sm:block" />
                             <span className="hidden sm:flex items-center gap-1">
                               <Shield className="h-2.5 w-2.5 text-[var(--accent)]" />
-                              FHE
+                              TEE
                             </span>
                           </div>
                         </div>

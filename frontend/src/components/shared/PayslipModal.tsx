@@ -14,11 +14,7 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
-import { formatUnits } from "viem";
 import { Modal } from "@/components/shared/Modal";
-import { useFhevm } from "@/hooks/useFhevm";
-import { useReadContract } from "wagmi";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
 
 interface PayslipModalProps {
   onClose: () => void;
@@ -28,11 +24,8 @@ interface PayslipModalProps {
   blockNumber: bigint;
   tokenSymbol: string;
   tokenDecimals: number;
-  /** "employee" shows salary decrypt, "employer" shows summary */
   mode: "employee" | "employer";
-  /** For employee mode */
   employeeAddress?: `0x${string}`;
-  /** For employer mode */
   employeeCount?: number;
 }
 
@@ -45,7 +38,6 @@ export function PayslipModal({
   txHash,
   blockNumber,
   tokenSymbol,
-  tokenDecimals,
   mode,
   employeeAddress,
   employeeCount,
@@ -56,58 +48,34 @@ export function PayslipModal({
   const [printTheme, setPrintTheme] = useState<"dark" | "light">("dark");
   const [decryptError, setDecryptError] = useState("");
 
-  const { decryptBalance, isReady } = useFhevm();
-
-  // For employee mode - get salary handle
-  const { data: salaryHandle } = useReadContract({
-    address: orgAddress,
-    abi: ORGANIZATION_ABI,
-    functionName: "salaryOf",
-    args: employeeAddress ? [employeeAddress] : undefined,
-    query: { enabled: mode === "employee" && !!employeeAddress },
-  });
-
   const handleDecryptSalary = useCallback(async () => {
-    if (!isReady || !employeeAddress) return;
+    if (!employeeAddress) return;
     setIsDecrypting(true);
     setDecryptError("");
 
     try {
-      const handle = salaryHandle as `0x${string}`;
-      if (
-        !handle ||
-        handle ===
-          "0x0000000000000000000000000000000000000000000000000000000000000000"
-      ) {
-        setSalary("0");
-        setIsDecrypting(false);
-        return;
-      }
-
-      const result = await decryptBalance(handle, orgAddress);
-      const raw = typeof result === "bigint" ? result : BigInt(String(result));
-      const humanReadable = formatUnits(raw, tokenDecimals);
-      const num = parseFloat(humanReadable);
-      setSalary(
-        num.toLocaleString(undefined, {
-          minimumFractionDigits: num < 1 ? 6 : 2,
-          maximumFractionDigits: num < 1 ? 6 : 2,
+      const res = await fetch("/api/enclave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_balance",
+          employeeAddress,
         }),
-      );
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSalary(data.balanceEth);
+      } else {
+        setDecryptError(data.error || "TEE Query failed");
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Decryption failed";
       setDecryptError(message);
     } finally {
       setIsDecrypting(false);
     }
-  }, [
-    isReady,
-    employeeAddress,
-    salaryHandle,
-    decryptBalance,
-    orgAddress,
-    tokenDecimals,
-  ]);
+  }, [employeeAddress]);
 
   const handlePrint = () => {
     const content = printRef.current;
@@ -122,7 +90,7 @@ export function PayslipModal({
       <!DOCTYPE html>
       <html>
       <head>
-        <title>DripPay ${type} - ${orgName}</title>
+        <title>Umbra Pay ${type} - ${orgName}</title>
         <meta charset="utf-8">
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -156,11 +124,9 @@ export function PayslipModal({
 
           .payslip {
             border: 2px solid var(--border-card);
-            border-radius: 0;
             background: var(--bg-card);
             position: relative;
             overflow: hidden;
-            box-shadow: none;
           }
 
           .header {
@@ -257,16 +223,6 @@ export function PayslipModal({
             font-size: 13px;
           }
 
-          .link-text {
-            color: #059669;
-            text-decoration: none;
-            word-break: break-all;
-          }
-
-          .link-text:hover {
-            text-decoration: underline;
-          }
-
           .amount-section {
             margin-top: 40px;
             padding: 30px;
@@ -288,13 +244,6 @@ export function PayslipModal({
             color: var(--text-main);
           }
 
-          .amount-currency {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-left: 8px;
-          }
-
           .footer {
             padding: 30px;
             border-top: 1px solid var(--border);
@@ -307,36 +256,6 @@ export function PayslipModal({
             font-size: 10px;
             color: var(--text-muted);
           }
-
-          .stamp {
-            position: absolute;
-            bottom: 60px;
-            right: 40px;
-            width: 100px;
-            height: 100px;
-            border: 4px solid rgba(0, 229, 160, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transform: rotate(-15deg);
-            opacity: 0.5;
-            pointer-events: none;
-          }
-
-          .stamp-text {
-            font-size: 12px;
-            font-weight: 900;
-            color: var(--accent);
-            text-align: center;
-            text-transform: uppercase;
-          }
-
-          @media print {
-            body { background: white; }
-            .print-container { padding: 0; }
-            .no-print { display: none; }
-          }
         </style>
       </head>
       <body>
@@ -344,11 +263,11 @@ export function PayslipModal({
           <div class="payslip">
             <div class="header">
               <div class="brand">
-                <span class="logo-text">DripPay</span>
+                <span class="logo-text">Umbra Pay</span>
                 <span class="doc-type">${type}</span>
               </div>
               <div class="badge-verified">
-                On-Chain Verified
+                Flare TEE Verified
               </div>
             </div>
 
@@ -365,13 +284,11 @@ export function PayslipModal({
                 </div>
                 <div class="info-box">
                   <div class="info-label">Network</div>
-                  <div class="info-value">Ethereum Sepolia</div>
+                  <div class="info-value">Coston2 (114) / Sepolia (11155111)</div>
                 </div>
                 <div class="info-box">
                   <div class="info-label">Contract Address</div>
-                  <div class="info-value mono">
-                    <a href="https://sepolia.etherscan.io/address/${orgAddress}" class="link-text" target="_blank">${orgAddress}</a>
-                  </div>
+                  <div class="info-value mono">${orgAddress}</div>
                 </div>
                 <div class="info-box">
                   <div class="info-label">Block Number</div>
@@ -382,29 +299,11 @@ export function PayslipModal({
                     ? `
                 <div class="info-box" style="grid-column: span 2;">
                   <div class="info-label">Recipient Address</div>
-                  <div class="info-value mono">
-                    <a href="https://sepolia.etherscan.io/address/${employeeAddress}" class="link-text" target="_blank">${employeeAddress}</a>
-                  </div>
+                  <div class="info-value mono">${employeeAddress}</div>
                 </div>
                 `
                     : ""
                 }
-                ${
-                  mode === "employer"
-                    ? `
-                <div class="info-box">
-                  <div class="info-label">Employees Included</div>
-                  <div class="info-value">${employeeCount || 0}</div>
-                </div>
-                `
-                    : ""
-                }
-                <div class="info-box" style="grid-column: span 2;">
-                  <div class="info-label">Transaction Hash</div>
-                  <div class="info-value mono">
-                    <a href="${ETHERSCAN_URL}/${txHash}" class="link-text" target="_blank">${txHash}</a>
-                  </div>
-                </div>
               </div>
 
               ${
@@ -413,44 +312,24 @@ export function PayslipModal({
               <div class="amount-section">
                 <div class="amount-label">Net Salary Payment</div>
                 <div class="amount-wrap">
-                  <span class="amount-value">${salary}</span>
-                  <span class="amount-currency">${tokenSymbol}</span>
+                  <span class="amount-value">${salary} ETH</span>
                 </div>
               </div>
               `
-                  : mode === "employer"
-                    ? `
-              <div class="amount-section" style="background: #fafafa; border-style: solid;">
-                <div class="amount-label">Payroll Execution Summary</div>
-                <div class="amount-wrap">
-                  <span class="amount-value" style="font-size: 24px;">CONFIRMED</span>
-                </div>
-              </div>
-              `
-                    : ""
+                  : ""
               }
             </div>
 
-            <div class="stamp">
-              <div class="stamp-text">FHE<br>SECURED</div>
-            </div>
-
             <div class="footer">
-              <div class="footer-text">This is a system-generated document and does not require a physical signature. Verified on Ethereum Sepolia.</div>
-              <div class="footer-text" style="font-weight: 600;">drip-payy.xyz</div>
+              <div class="footer-text">Verified on Flare Coston2 and Ethereum Sepolia.</div>
+              <div class="footer-text" style="font-weight: 600;">umbrapay.eth</div>
             </div>
-          </div>
-          
-          <div class="no-print" style="margin-top: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">
-            Tip: For best results, enable "Background Graphics" in your printer settings.
           </div>
         </div>
       </body>
       </html>
     `);
     printWindow.document.close();
-
-    // Give external fonts and styles a moment to load before triggering print
     printWindow.onload = () => {
       setTimeout(() => {
         printWindow.print();
@@ -471,8 +350,8 @@ export function PayslipModal({
     : "";
 
   const modalIcon = (
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-muted shadow-inner">
-      <FileText className="h-5 w-5 text-accent" />
+    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-muted)] shadow-inner">
+      <FileText className="h-5 w-5 text-[var(--accent)]" />
     </div>
   );
 
@@ -484,46 +363,37 @@ export function PayslipModal({
       maxWidth="max-w-xl"
     >
       <div className="space-y-6">
-        {/* Visual Receipt Card */}
         <div ref={printRef} className="relative overflow-hidden group">
-          {/* Subtle glow effect */}
-          <div className="absolute -inset-1 bg-linear-to-r from-accent to-emerald-400 rounded-2xl blur opacity-10 group-hover:opacity-20 transition duration-1000"></div>
+          <div className="relative payslip rounded-2xl border border-[var(--border-accent)] bg-[#0c0c14] overflow-hidden shadow-2xl">
+            <div className="h-1 w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-50"></div>
 
-          <div className="relative payslip rounded-2xl border border-border-accent bg-[#0c0c14] overflow-hidden shadow-2xl">
-            {/* Holographic line at top */}
-            <div className="h-1 w-full bg-linear-to-r from-transparent via-accent to-transparent opacity-50"></div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-white/2">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)] bg-white/2">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent shadow-[0_0_15px_rgba(0,229,160,0.3)]">
+                <div className="p-2 rounded-lg bg-[var(--accent)] shadow-[0_0_15px_rgba(0,229,160,0.3)]">
                   <Shield className="h-4 w-4 text-[#060608]" />
                 </div>
                 <span
                   className="logo text-xl font-black tracking-tighter text-white"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
-                  DRIP<span className="text-accent">PAY</span>
+                  UMBRA<span className="text-[var(--accent)]">PAY</span>
                 </span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-[10px] font-bold text-accent uppercase tracking-widest opacity-80 mb-1">
-                  Secure Protocol
+                <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest opacity-80 mb-1">
+                  TEE Protocol
                 </span>
-                <span className="badge flex items-center gap-1 rounded-md bg-accent-muted border border-border-accent px-2 py-0.5 text-[9px] font-bold text-accent uppercase tracking-wider">
-                  FHE VERIFIED
+                <span className="badge flex items-center gap-1 rounded-md bg-[var(--accent-muted)] border border-[var(--border-accent)] px-2 py-0.5 text-[9px] font-bold text-[var(--accent)] uppercase tracking-wider">
+                  FLARE TEE VERIFIED
                 </span>
               </div>
             </div>
 
-            {/* Main Body */}
             <div className="p-6 space-y-5">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-[10px] text-text-muted uppercase tracking-[0.2em] font-bold mb-1">
-                    {mode === "employee"
-                      ? "Employee Payslip"
-                      : "Payroll Summary"}
+                  <h3 className="text-[10px] text-[var(--text-muted)] uppercase tracking-[0.2em] font-bold mb-1">
+                    {mode === "employee" ? "Employee Payslip" : "Payroll Summary"}
                   </h3>
                   <h2
                     className="text-2xl font-extrabold text-[#f0f0f2] tracking-tight"
@@ -533,93 +403,74 @@ export function PayslipModal({
                   </h2>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-text-muted font-medium">
+                  <p className="text-[10px] text-[var(--text-muted)] font-medium">
                     TIMESTAMP
                   </p>
-                  <p className="text-xs font-bold text-text-secondary">
+                  <p className="text-xs font-bold text-[var(--text-secondary)]">
                     {date}
                   </p>
                 </div>
               </div>
 
-              {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col p-3 rounded-xl bg-white/3 border border-white/5 hover:bg-white/5 transition-colors">
-                  <span className="text-[9px] text-text-muted font-bold uppercase mb-1">
+                <div className="flex flex-col p-3 rounded-xl bg-white/3 border border-white/5">
+                  <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase mb-1">
                     Network
                   </span>
-                  <span className="text-xs font-semibold text-text-primary">
-                    Ethereum Sepolia
+                  <span className="text-xs font-semibold text-white">
+                    Flare Coston2 (114)
                   </span>
                 </div>
-                <div className="flex flex-col p-3 rounded-xl bg-white/3 border border-white/5 hover:bg-white/5 transition-colors">
-                  <span className="text-[9px] text-text-muted font-bold uppercase mb-1">
+                <div className="flex flex-col p-3 rounded-xl bg-white/3 border border-white/5">
+                  <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase mb-1">
                     Block Height
                   </span>
-                  <span className="text-xs font-mono font-bold text-accent">
+                  <span className="text-xs font-mono font-bold text-[var(--accent)]">
                     #{blockNumber.toString()}
                   </span>
                 </div>
               </div>
 
-              {/* Data Rows */}
               <div className="space-y-2.5">
-                <div className="group/row flex items-center justify-between rounded-xl bg-white/2 border border-transparent hover:border-white/10 hover:bg-white/4 px-4 py-3 transition-all">
-                  <span className="text-xs text-text-secondary font-medium flex items-center gap-2">
-                    <div className="w-1 h-1 rounded-full bg-text-muted group-hover/row:bg-accent transition-colors"></div>
-                    {mode === "employee" ? "Organization" : "Contract"}
+                <div className="flex items-center justify-between rounded-xl bg-white/2 px-4 py-3">
+                  <span className="text-xs text-[var(--text-secondary)] font-medium">
+                    Organization
                   </span>
-                  <span className="text-xs font-mono font-semibold text-text-primary">
+                  <span className="text-xs font-mono font-semibold text-white">
                     {shortOrg}
                   </span>
                 </div>
 
                 {mode === "employee" && employeeAddress && (
-                  <div className="group/row flex items-center justify-between rounded-xl bg-white/2 border border-transparent hover:border-white/10 hover:bg-white/4 px-4 py-3 transition-all">
-                    <span className="text-xs text-text-secondary font-medium flex items-center gap-2">
-                      <div className="w-1 h-1 rounded-full bg-text-muted group-hover/row:bg-accent transition-colors"></div>
+                  <div className="flex items-center justify-between rounded-xl bg-white/2 px-4 py-3">
+                    <span className="text-xs text-[var(--text-secondary)] font-medium">
                       Recipient
                     </span>
-                    <span className="text-xs font-mono font-semibold text-text-primary">
+                    <span className="text-xs font-mono font-semibold text-white">
                       {shortEmp}
                     </span>
                   </div>
                 )}
 
-                {mode === "employer" && employeeCount !== undefined && (
-                  <div className="group/row flex items-center justify-between rounded-xl bg-white/2 border border-transparent hover:border-white/10 hover:bg-white/4 px-4 py-3 transition-all">
-                    <span className="text-xs text-text-secondary font-medium flex items-center gap-2">
-                      <div className="w-1 h-1 rounded-full bg-text-muted group-hover/row:bg-accent transition-colors"></div>
-                      Recipient Count
-                    </span>
-                    <span className="text-xs font-bold text-text-primary">
-                      {employeeCount} Employees
-                    </span>
-                  </div>
-                )}
-
-                <div className="group/row flex items-center justify-between rounded-xl bg-white/2 border border-transparent hover:border-white/10 hover:bg-white/4 px-4 py-3 transition-all">
-                  <span className="text-xs text-text-secondary font-medium flex items-center gap-2">
-                    <div className="w-1 h-1 rounded-full bg-text-muted group-hover/row:bg-accent transition-colors"></div>
+                <div className="flex items-center justify-between rounded-xl bg-white/2 px-4 py-3">
+                  <span className="text-xs text-[var(--text-secondary)] font-medium">
                     Transaction
                   </span>
                   <a
                     href={`${ETHERSCAN_URL}/${txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs font-mono font-semibold text-accent hover:text-accent-hover transition-colors group/link"
+                    className="flex items-center gap-1.5 text-xs font-mono font-semibold text-[var(--accent)]"
                   >
                     {shortTx}
-                    <ExternalLink className="h-3 w-3 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
+                    <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
               </div>
 
-              {/* Prominent Salary/Status section */}
               {mode === "employee" && (
-                <div className="relative mt-4 group/salary">
-                  <div className="absolute -inset-0.5 bg-linear-to-r from-accent to-emerald-500 rounded-2xl blur opacity-20 group-hover/salary:opacity-40 transition-opacity"></div>
-                  <div className="relative flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#0e1614] p-8 transition-transform group-hover/salary:scale-[1.01]">
+                <div className="relative mt-4">
+                  <div className="relative flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#0e1614] p-8">
                     <span className="text-[11px] font-bold text-[#94a3b8] uppercase tracking-[0.2em] mb-3">
                       DISBURSED AMOUNT
                     </span>
@@ -638,7 +489,7 @@ export function PayslipModal({
                           >
                             {salary}
                           </span>
-                          <span className="text-lg font-bold text-accent">
+                          <span className="text-lg font-bold text-[var(--accent)]">
                             {tokenSymbol}
                           </span>
                         </motion.div>
@@ -647,33 +498,11 @@ export function PayslipModal({
                           key="encrypted"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          exit={{
-                            opacity: 0,
-                            scale: 0.9,
-                            filter: "blur(10px)",
-                          }}
                           className="flex flex-col items-center gap-4"
                         >
-                          <div className="flex items-center gap-2">
-                            {[...Array(6)].map((_, j) => (
-                              <motion.span
-                                key={j}
-                                animate={{
-                                  opacity: [0.3, 0.6, 0.3],
-                                  scale: [1, 1.05, 1],
-                                }}
-                                transition={{
-                                  duration: 2,
-                                  repeat: Infinity,
-                                  delay: j * 0.15,
-                                }}
-                                className="h-7 w-3.5 rounded-full bg-accent/60 shadow-[0_0_8px_rgba(0,229,160,0.2)]"
-                              />
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-text-muted">
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)]">
                             <Lock className="h-3 w-3" />
-                            END-TO-END ENCRYPTED
+                            CONFIDENTIAL TEE STATE
                           </div>
                         </motion.div>
                       )}
@@ -684,36 +513,29 @@ export function PayslipModal({
 
               {mode === "employer" && (
                 <div className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-white/2 p-8 text-center">
-                  <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mb-4 ring-1 ring-accent/20">
-                    <CheckCircle2 className="h-6 w-6 text-accent" />
+                  <div className="w-12 h-12 rounded-full bg-[var(--accent)]/10 flex items-center justify-center mb-4 ring-1 ring-[var(--accent)]/20">
+                    <CheckCircle2 className="h-6 w-6 text-[var(--accent)]" />
                   </div>
                   <h4 className="text-xl font-bold text-white tracking-tight mb-1">
-                    System Verified
+                    Coston2 Payroll Verified
                   </h4>
-                  <p className="text-xs text-text-secondary max-w-50 leading-relaxed mx-auto">
-                    This transaction has been successfully confirmed and
-                    verified on the Ethereum network.
+                  <p className="text-xs text-[var(--text-secondary)] max-w-50 leading-relaxed mx-auto">
+                    This transaction has been successfully confirmed and verified on Flare Coston2.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Subtle Footer */}
             <div className="flex items-center justify-between px-6 py-4 bg-white/1 border-t border-white/5">
-              <a
-                href={`${ETHERSCAN_URL}/${txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[9px] font-bold text-text-muted tracking-widest uppercase hover:text-accent transition-colors"
-              >
+              <span className="text-[9px] font-bold text-[var(--text-muted)] tracking-widest uppercase">
                 ID: {txHash.slice(2, 10).toUpperCase()}
-              </a>
+              </span>
               <div className="flex items-center gap-4">
-                <span className="text-[10px] font-medium text-text-muted">
-                  drip-payy.xyz
+                <span className="text-[10px] font-medium text-[var(--text-muted)]">
+                  umbrapay.eth
                 </span>
-                <div className="flex items-center gap-1 text-[10px] font-bold text-accent">
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
+                <div className="flex items-center gap-1 text-[10px] font-bold text-[var(--accent)]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></div>
                   ON-CHAIN
                 </div>
               </div>
@@ -721,43 +543,37 @@ export function PayslipModal({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex flex-col gap-3 pt-2">
           {mode === "employee" && !salary && (
             <button
               onClick={handleDecryptSalary}
-              disabled={isDecrypting || !isReady}
+              disabled={isDecrypting}
               className="group relative w-full overflow-hidden rounded-xl bg-white/3 p-px transition-all hover:bg-white/5 disabled:opacity-50"
             >
-              <div className="relative flex items-center justify-center gap-2 rounded-xl bg-[#09090b] px-6 py-4 text-sm font-bold text-white transition-all group-hover:bg-transparent">
+              <div className="relative flex items-center justify-center gap-2 rounded-xl bg-[#09090b] px-6 py-4 text-sm font-bold text-white transition-all">
                 {isDecrypting ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin text-accent" />
-                    <span className="bg-linear-to-r from-white to-white/60 bg-clip-text text-transparent">
-                      SECURE DECRYPTING...
-                    </span>
+                    <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
+                    <span>TEE QUERYING...</span>
                   </>
                 ) : (
                   <>
-                    <Eye className="h-4 w-4 text-accent" />
+                    <Eye className="h-4 w-4 text-[var(--accent)]" />
                     <span>REVEAL PAYSLIP DETAILS</span>
                   </>
                 )}
               </div>
-              <div className="absolute inset-0 -translate-x-full transition-transform group-hover:translate-x-0 bg-linear-to-r from-transparent via-white/10 to-transparent skew-x-12"></div>
             </button>
           )}
 
           {decryptError && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-center gap-2 justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
               <p className="text-[11px] font-bold text-red-400 uppercase tracking-wider">
                 {decryptError}
               </p>
             </div>
           )}
 
-          {/* Theme toggle for PDF */}
           <div className="flex items-center justify-center gap-1 rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] p-1">
             <button
               onClick={() => setPrintTheme("dark")}
@@ -785,11 +601,10 @@ export function PayslipModal({
 
           <button
             onClick={handlePrint}
-            className="group relative flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-4 text-sm font-bold text-[#060608] transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_8px_30px_rgba(0,229,160,0.2)]"
+            className="group relative flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 text-sm font-bold text-[#060608] transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Printer className="h-4 w-4" />
             <span>PRINT / GENERATE PDF</span>
-            <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
           </button>
         </div>
       </div>

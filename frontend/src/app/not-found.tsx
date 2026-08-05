@@ -109,7 +109,7 @@ export default function NotFound() {
         >
           <Lock className="h-3 w-3 text-[var(--text-muted)]" />
           <span className="font-mono text-xs text-[var(--text-muted)]">
-            FHE(
+            TEE(
             <motion.span
               animate={{ opacity: [0.3, 0.7, 0.3] }}
               transition={{ duration: 2, repeat: Infinity }}
@@ -146,7 +146,7 @@ export default function NotFound() {
         transition={{ delay: 1, duration: 1 }}
         className="absolute bottom-6 text-xs text-[var(--text-muted)]"
       >
-        DripPay - Privacy-first on-chain payroll
+        Umbra Pay - Privacy-first on-chain payroll
       </motion.p>
     </div>
   );

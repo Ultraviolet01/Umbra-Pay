@@ -162,7 +162,7 @@ export function CTASection() {
           className="mt-16 text-xs tracking-wide text-[var(--text-muted)]"
         >
           Powered by{" "}
-          <span className="text-[var(--text-secondary)]">Zama fhEVM</span>
+          <span className="text-[var(--text-secondary)]">Flare TEE Enclave</span>
           {" "}&middot;{" "}
           Built on{" "}
           <span className="text-[var(--text-secondary)]">Ethereum</span>

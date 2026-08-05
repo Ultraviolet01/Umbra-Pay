@@ -17,14 +17,11 @@ import { UpdateSalaryModal } from "@/components/dashboard/UpdateSalaryModal";
 import { PayrollConfirmModal } from "@/components/dashboard/PayrollConfirmModal";
 import { DepositCard } from "@/components/dashboard/DepositCard";
 import { useOrganization } from "@/hooks/useOrganization";
-import { useERC20 } from "@/hooks/useERC20";
 import { useContractEvents } from "@/hooks/useContractEvents";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
+import { UMBRA_ORG_ABI } from "@/lib/contracts";
 import type { Employee } from "@/lib/mock-data";
 import { fadeUpSmall } from "@/lib/animations";
 import { Star4, CrossMark, Diamond, Dot } from "@/components/shared/Stars";
-
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 export default function OrgDashboard({ address: orgAddress }: { address: `0x${string}` }) {
   const { isConnected } = useAccount();
@@ -55,23 +52,14 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
 
   const { events: payrollEvents } = useContractEvents({
     address: orgAddress,
-    abi: ORGANIZATION_ABI as any,
+    abi: UMBRA_ORG_ABI as any,
     eventName: "PayrollExecuted",
     enabled: true,
   });
 
-  const {
-    symbol: tokenSymbol,
-    decimals: tokenDecimals,
-  } = useERC20(
-    !isETH && paymentToken ? paymentToken : undefined,
-    orgAddress,
-  );
+  const displaySymbol = "ETH";
+  const displayDecimals = 18;
 
-  const displaySymbol = isETH ? "ETH" : tokenSymbol || "TOKEN";
-  const displayDecimals = isETH ? 18 : tokenDecimals ?? 18;
-
-  // Employee metadata stored in localStorage
   const getEmployeeMeta = (empAddr: string) => {
     if (typeof window === "undefined") return null;
     try {
@@ -87,7 +75,6 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
     localStorage.setItem(key, JSON.stringify(meta));
   };
 
-  // Get last payroll timestamp (raw seconds + formatted)
   const lastPayrollTimestampSec = payrollEvents.length > 0
     ? (() => {
         const args = payrollEvents[0].args as Record<string, any>;
@@ -205,7 +192,7 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
                     </h1>
                     <p className="mt-0.5 text-xs sm:text-sm text-[var(--text-secondary)]">
                       {orgCreatedDate ? `Created ${orgCreatedDate} · ` : ""}
-                      Paying in {displaySymbol}
+                      Paying in ETH
                     </p>
                     <CopyOrgAddress address={orgAddress} />
                   </div>
@@ -217,11 +204,11 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
                       transition={{ duration: 2, repeat: Infinity }}
                       className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]"
                     />
-                    <span className="text-xs text-[var(--text-secondary)]">Sepolia</span>
+                    <span className="text-xs text-[var(--text-secondary)]">Coston2 (114) / Sepolia</span>
                   </div>
                   <div className="flex items-center gap-2 rounded-full border border-[var(--border-accent)] bg-[var(--accent-muted)] px-3 py-1.5">
                     <Shield className="h-3 w-3 text-[var(--accent)]" />
-                    <span className="text-xs font-medium text-[var(--accent)]">FHE Active</span>
+                    <span className="text-xs font-medium text-[var(--accent)]">TEE Enclave Active</span>
                   </div>
                 </div>
               </div>
@@ -296,7 +283,6 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
         )}
       </div>
 
-      {/* Modals */}
       <AnimatePresence>
         {showAddEmployee && (
           <AddEmployeeModal

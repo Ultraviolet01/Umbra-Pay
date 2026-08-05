@@ -26,7 +26,7 @@ interface SerializedEvent {
 }
 
 function cacheKey(address: string): string {
-  return `drippay_allevents_${address}`.toLowerCase();
+  return `umbra_allevents_${address}`.toLowerCase();
 }
 
 function loadCache(address: string): CachedData | null {

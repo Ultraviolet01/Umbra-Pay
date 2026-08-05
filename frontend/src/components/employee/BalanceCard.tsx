@@ -130,7 +130,7 @@ export function BalanceCard({
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-[var(--accent)]" />
               <span className="text-xs text-[var(--text-secondary)]">
-                FHE Encrypted
+                TEE Confidential
               </span>
             </div>
             <div className="flex items-center gap-2">

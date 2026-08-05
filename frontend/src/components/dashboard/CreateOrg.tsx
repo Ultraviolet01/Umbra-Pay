@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Building2, ArrowRight, Loader2, Coins, Calendar } from "lucide-react";
+import { CONTRACTS } from "@/lib/contracts";
 
 const PAYROLL_CYCLES = [
   { label: "One-time", days: 0, desc: "Manual execution only" },
@@ -12,27 +13,20 @@ const PAYROLL_CYCLES = [
 ] as const;
 
 interface CreateOrgProps {
-  onOrgCreated: (name: string, paymentToken: `0x${string}`, payrollCycleDays: number) => void;
+  onOrgCreated: (name: string, teeVaultAddress: `0x${string}`, payrollCycleDays: number) => void;
   isDeploying?: boolean;
 }
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string}`;
-
 export function CreateOrg({ onOrgCreated, isDeploying = false }: CreateOrgProps) {
   const [orgName, setOrgName] = useState("");
-  const [tokenType, setTokenType] = useState<"eth" | "erc20">("eth");
-  const [tokenAddress, setTokenAddress] = useState("");
   const [payrollCycle, setPayrollCycle] = useState(30);
 
   const handleCreate = () => {
     if (!orgName.trim() || isDeploying) return;
-    const paymentToken = tokenType === "eth"
-      ? ZERO_ADDRESS
-      : (tokenAddress.trim() as `0x${string}`);
-    onOrgCreated(orgName.trim(), paymentToken, payrollCycle);
+    onOrgCreated(orgName.trim(), CONTRACTS.teeVault, payrollCycle);
   };
 
-  const isValid = orgName.trim() && (tokenType === "eth" || tokenAddress.trim().startsWith("0x"));
+  const isValid = Boolean(orgName.trim());
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -55,8 +49,8 @@ export function CreateOrg({ onOrgCreated, isDeploying = false }: CreateOrgProps)
               Create Your Organization
             </h2>
             <p className="mb-8 text-sm text-[var(--text-secondary)]">
-              Deploy an encrypted payroll contract onchain. All salary data
-              will be protected by FHE.
+              Deploy a private payroll organization onchain. All salary data
+              is protected by TEE hardware isolation.
             </p>
 
             <div className="space-y-4 text-left">
@@ -77,63 +71,16 @@ export function CreateOrg({ onOrgCreated, isDeploying = false }: CreateOrgProps)
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                  Payment Token
+                  Payment Currency
                 </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTokenType("eth")}
-                    disabled={isDeploying}
-                    className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
-                      tokenType === "eth"
-                        ? "border-[var(--border-accent)] bg-[rgba(0,229,160,0.06)] text-[var(--accent)]"
-                        : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--border-hover)]"
-                    }`}
-                  >
-                    <Coins className="h-4 w-4" />
-                    ETH
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTokenType("erc20")}
-                    disabled={isDeploying}
-                    className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
-                      tokenType === "erc20"
-                        ? "border-[var(--border-accent)] bg-[rgba(0,229,160,0.06)] text-[var(--accent)]"
-                        : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--border-hover)]"
-                    }`}
-                  >
-                    <Coins className="h-4 w-4" />
-                    ERC-20
-                  </button>
+                <div className="flex items-center justify-between rounded-xl border border-[var(--border-accent)] bg-[rgba(0,229,160,0.06)] px-4 py-3 text-sm font-medium text-[var(--accent)]">
+                  <div className="flex items-center gap-2">
+                    <Coins className="h-4 w-4 text-[var(--accent)]" />
+                    <span>Native ETH</span>
+                  </div>
+                  <span className="text-xs text-[var(--text-muted)]">Ethereum Sepolia Vault</span>
                 </div>
               </div>
-
-              <AnimatePresence>
-                {tokenType === "erc20" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                      Token Contract Address
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="0x..."
-                      value={tokenAddress}
-                      onChange={(e) => setTokenAddress(e.target.value)}
-                      className="input-field font-mono text-sm"
-                      disabled={isDeploying}
-                    />
-                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                      The ERC-20 token contract address for salary payments
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* Payroll Cycle */}
               <div>
@@ -204,7 +151,7 @@ export function CreateOrg({ onOrgCreated, isDeploying = false }: CreateOrgProps)
 
               {!isDeploying && (
                 <p className="text-xs text-[var(--text-muted)] text-center">
-                  This will deploy a new smart contract on Ethereum Sepolia
+                  This will deploy a new smart contract on Flare Coston2
                 </p>
               )}
             </div>

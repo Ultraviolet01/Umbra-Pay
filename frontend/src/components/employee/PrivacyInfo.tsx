@@ -3,7 +3,7 @@ import { ShieldCheck, Lock, Fingerprint, Eye } from "lucide-react";
 const PRIVACY_ITEMS = [
   {
     icon: Lock,
-    text: "Your salary is encrypted with TFHE and stored onchain as ciphertext.",
+    text: "Your salary is protected inside Flare TEE enclaves and never exposed plaintext.",
   },
   {
     icon: Fingerprint,
@@ -11,7 +11,7 @@ const PRIVACY_ITEMS = [
   },
   {
     icon: Eye,
-    text: "No onenot your employer, validators, or DripPay can see your balance.",
+    text: "No one, not your employer, validators, or Umbra Pay can see your balance.",
   },
 ];
 

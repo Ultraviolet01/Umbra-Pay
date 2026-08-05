@@ -8,18 +8,18 @@ import "@rainbow-me/rainbowkit/styles.css";
 
 const queryClient = new QueryClient();
 
-const dripPayTheme = darkTheme({
+const umbraPayTheme = darkTheme({
   accentColor: "#00e5a0",
   accentColorForeground: "#04040c",
   borderRadius: "medium",
   overlayBlur: "small",
 });
 
-// Override specific theme tokens to match DripPay's design system
+// Override specific theme tokens to match Umbra Pay's design system
 const customTheme = {
-  ...dripPayTheme,
+  ...umbraPayTheme,
   colors: {
-    ...dripPayTheme.colors,
+    ...umbraPayTheme.colors,
     modalBackground: "#0e0e24",
     modalBorder: "rgba(255, 255, 255, 0.06)",
     profileForeground: "#08081a",

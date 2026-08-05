@@ -1,4 +1,3 @@
-import "@fhevm/hardhat-plugin";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-verify";
@@ -33,10 +32,15 @@ const config: HardhatUserConfig = {
       },
       chainId: 31337,
     },
-    sepolia: {
+    coston2: {
+      url: process.env.COSTON2_RPC || "https://coston2-api.flare.network/ext/C/rpc",
+      chainId: 114,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : { mnemonic: MNEMONIC },
+    },
+    sepolia: {
+      url: process.env.SEPOLIA_RPC || `https://sepolia.infura.io/v3/${INFURA_API_KEY}` || "https://ethereum-sepolia-rpc.publicnode.com",
       chainId: 11155111,
-      url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : { mnemonic: MNEMONIC },
     },
   },
   paths: {

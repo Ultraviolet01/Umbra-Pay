@@ -2,116 +2,125 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDownToLine, Loader2, Check, Wallet, ExternalLink } from "lucide-react";
+import { ArrowDownToLine, Loader2, Check, Wallet, ExternalLink, ShieldCheck, AlertCircle } from "lucide-react";
 import { parseEther } from "viem";
-import { useWaitForTransactionReceipt } from "wagmi";
-import { useERC20 } from "@/hooks/useERC20";
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
 import { fadeUpSmall } from "@/lib/animations";
-import { useEthPrice, formatUsd } from "@/hooks/useEthPrice";
+import { CONTRACTS } from "@/lib/contracts";
 
 interface DepositCardProps {
-  orgAddress: `0x${string}`;
-  isETH: boolean;
+  teeVaultAddress?: `0x${string}`;
+  orgAddress?: `0x${string}`;
+  isETH?: boolean;
   paymentToken?: `0x${string}`;
   contractBalance?: bigint;
   tokenSymbol?: string;
   tokenDecimals?: number;
-  onDeposit: (amount: bigint, isETH: boolean) => void;
-  isPending: boolean;
+  onDeposit?: (amount: string) => void;
+  isPending?: boolean;
   txHash?: `0x${string}`;
   resetTx?: () => void;
-  refetchBalance: () => void;
+  refetchBalance?: () => void;
 }
 
+const PRESET_AMOUNTS = ["0.05", "0.1", "0.5"];
+
 export function DepositCard({
+  teeVaultAddress = CONTRACTS.teeVault,
   orgAddress,
-  isETH,
-  paymentToken,
-  contractBalance,
-  tokenSymbol,
-  tokenDecimals = 18,
-  onDeposit,
-  isPending,
-  txHash,
-  resetTx,
   refetchBalance,
 }: DepositCardProps) {
   const [amount, setAmount] = useState("");
   const [depositedAmount, setDepositedAmount] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const {
-    approve,
-    isApproving,
-    allowance,
-    refetchAllowance,
-  } = useERC20(
-    !isETH ? paymentToken : undefined,
-    !isETH ? orgAddress : undefined,
-  );
+  const { chain } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+  const { sendTransaction, data: txHash, isPending: isSendPending, reset: resetSend, error: sendError } = useSendTransaction();
 
-  const { isSuccess: isTxConfirmed } = useWaitForTransactionReceipt({
+  const { isSuccess: isTxConfirmed, isLoading: isWaitingTx } = useWaitForTransactionReceipt({
     hash: txHash,
+    chainId: 11155111,
     query: { enabled: !!txHash },
   });
 
-  // Track tx confirmation
+  const handleDeposit = async () => {
+    setErrorMessage("");
+    const num = Number(amount);
+    if (!amount || isNaN(num) || num <= 0) {
+      setErrorMessage("Please enter a valid ETH amount above 0.");
+      return;
+    }
+
+    try {
+      if (chain?.id !== 11155111 && switchChainAsync) {
+        await switchChainAsync({ chainId: 11155111 });
+      }
+      const valueWei = parseEther(amount);
+      setDepositedAmount(amount);
+      sendTransaction({
+        to: teeVaultAddress,
+        value: valueWei,
+        chainId: 11155111,
+      });
+    } catch (err: any) {
+      console.error("Deposit error:", err);
+      setErrorMessage(err?.shortMessage || err?.message || "Failed to submit transaction.");
+    }
+  };
+
   useEffect(() => {
-    if (isTxConfirmed && txHash && !isSuccess) {
+    if (sendError) {
+      setErrorMessage((sendError as any)?.shortMessage || sendError.message || "Transaction rejected or failed");
+    }
+  }, [sendError]);
+
+  useEffect(() => {
+    if (isTxConfirmed && txHash) {
       setIsSuccess(true);
-      refetchBalance();
-      if (!isETH) refetchAllowance();
+      setErrorMessage("");
+      refetchBalance?.();
 
-      setTimeout(() => {
+      if (typeof window !== "undefined") {
+        const key = `drippay_deposits_${orgAddress || "all"}`.toLowerCase();
+        try {
+          const raw = localStorage.getItem(key);
+          const list = raw ? JSON.parse(raw) : [];
+          list.unshift({
+            txHash,
+            amountEth: depositedAmount || amount,
+            timestamp: Date.now(),
+          });
+          localStorage.setItem(key, JSON.stringify(list));
+          window.dispatchEvent(new Event("drippay_deposit_added"));
+        } catch (e) {
+          console.error("Save deposit error", e);
+        }
+      }
+
+      fetch("/api/enclave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "deposit",
+          depositAmountEth: depositedAmount || amount,
+        }),
+      }).catch((e) => console.error("Enclave sync error", e));
+
+      const timer = setTimeout(() => {
         setIsSuccess(false);
-        setDepositedAmount("");
-        resetTx?.();
-      }, 3500);
+        setAmount("");
+        resetSend();
+      }, 5000);
+
+      return () => clearTimeout(timer);
     }
-  }, [isTxConfirmed, txHash, isSuccess]);
+  }, [isTxConfirmed, txHash, depositedAmount, amount, resetSend]);
 
-  const parsedAmount = (() => {
-    if (!amount || isNaN(Number(amount))) return BigInt(0);
-    if (isETH) {
-      return parseEther(amount);
-    }
-    return BigInt(Math.floor(Number(amount) * 10 ** tokenDecimals));
-  })();
-
-  const needsApproval = !isETH && allowance !== undefined && parsedAmount > BigInt(0) && allowance < parsedAmount;
-
-  const formatBalance = (bal?: bigint) => {
-    if (bal === undefined) return "—";
-    if (isETH) {
-      const eth = Number(bal) / 1e18;
-      return eth.toFixed(eth < 0.01 ? 6 : 4);
-    }
-    const dec = tokenDecimals || 18;
-    const val = Number(bal) / 10 ** dec;
-    return val.toFixed(val < 0.01 ? 6 : 2);
-  };
-
-  const symbol = isETH ? "ETH" : tokenSymbol || "TOKEN";
-  const ethPrice = useEthPrice();
-
-  const isWaitingForConfirmation = !!txHash && !isTxConfirmed && !isSuccess;
-
-  const handleDeposit = () => {
-    if (parsedAmount <= BigInt(0)) return;
-    setDepositedAmount(amount);
-    onDeposit(parsedAmount, isETH);
-    setAmount("");
-  };
-
-  const handleApprove = () => {
-    if (parsedAmount <= BigInt(0)) return;
-    approve(parsedAmount);
-    setTimeout(() => refetchAllowance(), 3000);
-  };
-
-  const shortTx = txHash
-    ? `${txHash.slice(0, 6)}...${txHash.slice(-4)}`
-    : "";
+  const shortTx = txHash ? `${txHash.slice(0, 6)}...${txHash.slice(-4)}` : "";
+  const isBusy = isSendPending || isWaitingTx;
+  const isButtonDisabled = isBusy || !amount || Number(amount) <= 0;
 
   return (
     <motion.div
@@ -127,19 +136,18 @@ export function DepositCard({
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-muted)] transition-colors group-hover:bg-[rgba(0,229,160,0.12)]">
             <Wallet className="h-5 w-5 text-[var(--accent)]" />
           </div>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] text-blue-400 font-medium">
+            <ShieldCheck className="h-3 w-3" />
+            Sepolia Vault (11155111)
+          </div>
         </div>
 
-        <p className="text-xs text-[var(--text-muted)] mb-1">Contract Balance</p>
+        <p className="text-xs text-[var(--text-muted)] mb-1">TEE Liquidity Vault</p>
         <p
-          className="text-lg sm:text-xl font-bold tracking-tight mb-1 truncate"
-          style={{ fontFamily: "var(--font-display)" }}
+          className="text-sm font-mono text-[var(--accent)] truncate mb-4"
+          title={teeVaultAddress}
         >
-          {formatBalance(contractBalance)} <span className="text-xs sm:text-sm font-normal text-[var(--text-muted)]">{symbol}</span>
-        </p>
-        <p className="text-[11px] text-[var(--text-muted)] mb-4">
-          {isETH && ethPrice && contractBalance !== undefined && contractBalance > BigInt(0)
-            ? `~${formatUsd(Number(contractBalance) / 1e18 * ethPrice)} USD`
-            : "Available for employee withdrawals"}
+          {teeVaultAddress}
         </p>
 
         <AnimatePresence mode="wait">
@@ -163,10 +171,10 @@ export function DepositCard({
                 className="font-bold gradient-text text-base mb-1"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {depositedAmount} {symbol} Deposited
+                {depositedAmount} ETH Deposited
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
-                Transaction confirmed
+                Plain native ETH transfer confirmed on Ethereum Sepolia
               </p>
               {txHash && (
                 <a
@@ -191,98 +199,70 @@ export function DepositCard({
                 <div className="relative">
                   <input
                     type="number"
-                    placeholder="0.0"
+                    placeholder="0.0 ETH"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      if (errorMessage) setErrorMessage("");
+                    }}
                     step="any"
                     min="0"
                     className="input-field !pr-16 text-sm"
-                    disabled={isPending || isApproving || isWaitingForConfirmation}
+                    disabled={isBusy}
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)] font-medium">
-                    {symbol}
+                    ETH
                   </div>
                 </div>
 
-                {/* Tx progress */}
-                <AnimatePresence>
-                  {(isPending || isWaitingForConfirmation) && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
+                {/* Preset quick buttons */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[var(--text-muted)]">Quick:</span>
+                  {PRESET_AMOUNTS.map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        setAmount(val);
+                        if (errorMessage) setErrorMessage("");
+                      }}
+                      disabled={isBusy}
+                      className="rounded-lg border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-2.5 py-1 text-[11px] font-mono text-[var(--text-secondary)] hover:border-[var(--border-accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-50"
                     >
-                      <div className="rounded-lg bg-[rgba(0,229,160,0.04)] border border-[var(--border-accent)] p-3 space-y-2">
-                        <div className="flex items-center gap-2">
-                          {isPending ? (
-                            <Loader2 className="h-3 w-3 animate-spin text-[var(--accent)]" />
-                          ) : (
-                            <Check className="h-3 w-3 text-[var(--accent)]" />
-                          )}
-                          <span className={`text-[11px] ${!isPending ? "text-[var(--text-secondary)]" : "text-[var(--accent)]"}`}>
-                            {isPending ? "Confirm in your wallet..." : "Wallet confirmed"}
-                          </span>
-                        </div>
-                        {isWaitingForConfirmation && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex items-center gap-2"
-                          >
-                            <Loader2 className="h-3 w-3 animate-spin text-[var(--accent)]" />
-                            <span className="text-[11px] text-[var(--accent)]">
-                              Waiting for on-chain confirmation...
-                            </span>
-                          </motion.div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      {val} ETH
+                    </button>
+                  ))}
+                </div>
 
-                {needsApproval ? (
-                  <button
-                    onClick={handleApprove}
-                    disabled={isApproving || parsedAmount <= BigInt(0)}
-                    className="btn-secondary w-full !py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isApproving ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Approving...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-3.5 w-3.5" />
-                        Approve {symbol}
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleDeposit}
-                    disabled={isPending || isWaitingForConfirmation || parsedAmount <= BigInt(0)}
-                    className="btn-primary w-full !py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isPending ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Confirm in wallet...
-                      </>
-                    ) : isWaitingForConfirmation ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Confirming...
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDownToLine className="h-3.5 w-3.5" />
-                        Deposit {symbol}
-                      </>
-                    )}
-                  </button>
+                {errorMessage && (
+                  <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{errorMessage}</span>
+                  </div>
                 )}
+
+                <button
+                  onClick={handleDeposit}
+                  disabled={isButtonDisabled}
+                  className="btn-primary w-full !py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isSendPending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Approve in Wallet...
+                    </>
+                  ) : isWaitingTx ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Waiting Sepolia Confirmation...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDownToLine className="h-3.5 w-3.5" />
+                      Deposit Native ETH to TEE
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           )}

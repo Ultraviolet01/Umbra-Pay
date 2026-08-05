@@ -41,7 +41,7 @@ export function ExportHistory({ events, orgName, tokenSymbol, mode }: ExportHist
   if (events.length === 0) return null;
 
   const safeName = orgName.replace(/\s+/g, "-").toLowerCase();
-  const filePrefix = mode === "employer" ? `drippay-history-${safeName}` : `drippay-transactions-${safeName}`;
+  const filePrefix = mode === "employer" ? `umbrapay-history-${safeName}` : `umbrapay-transactions-${safeName}`;
 
   const handleCSV = () => {
     const rows = [
@@ -92,7 +92,7 @@ export function ExportHistory({ events, orgName, tokenSymbol, mode }: ExportHist
       <!DOCTYPE html>
       <html>
       <head>
-        <title>DripPay ${title} - ${orgName}</title>
+        <title>Umbra Pay ${title} - ${orgName}</title>
         <meta charset="utf-8">
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -318,7 +318,7 @@ export function ExportHistory({ events, orgName, tokenSymbol, mode }: ExportHist
         <div class="page">
           <div class="header">
             <div class="brand">
-              <div class="logo">DRIP<span>PAY</span></div>
+              <div class="logo">UMBRA<span>PAY</span></div>
               <div class="doc-type">${title}</div>
             </div>
             <div class="meta">

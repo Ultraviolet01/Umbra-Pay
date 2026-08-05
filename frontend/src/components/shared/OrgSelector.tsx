@@ -98,7 +98,7 @@ export function OrgSelector({
                       </span>
                       <span className="hidden sm:inline-flex items-center gap-1">
                         <Shield className="h-3 w-3" />
-                        FHE
+                        TEE
                       </span>
                       <CopyAddress address={(org as any).fullAddress || org.id} display={org.address} />
                     </div>

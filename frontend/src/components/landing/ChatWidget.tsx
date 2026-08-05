@@ -20,8 +20,8 @@ interface Message {
 }
 
 const QUICK_QUESTIONS = [
-  { icon: HelpCircle, label: "What is DripPay?" },
-  { icon: Lock, label: "How does FHE keep salaries private?" },
+  { icon: HelpCircle, label: "What is Umbra Pay?" },
+  { icon: Lock, label: "How does TEE keep salaries private?" },
   { icon: Wallet, label: "How do I get started as an employer?" },
 ];
 
@@ -164,7 +164,7 @@ export function ChatWidget() {
                     className="text-sm font-bold text-[var(--text-primary)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
-                    DripPay AI
+                    Umbra Pay AI
                   </h3>
                   <div className="flex items-center gap-1.5">
                     <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
@@ -200,7 +200,7 @@ export function ChatWidget() {
                       Hey, how can I help?
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Ask me anything about DripPay
+                      Ask me anything about Umbra Pay
                     </p>
                   </div>
 
@@ -281,7 +281,7 @@ export function ChatWidget() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about DripPay..."
+                  placeholder="Ask about Umbra Pay..."
                   disabled={isLoading}
                   className="flex-1 bg-[rgba(255,255,255,0.03)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--border-accent)] transition-colors disabled:opacity-50"
                 />

@@ -1,154 +1,88 @@
 <p align="center">
-  <img src="frontend/src/app/icon.svg" alt="DripPay Logo" width="64" height="64" />
+  <img src="frontend/src/app/icon.svg" alt="Umbra Pay Logo" width="64" height="64" />
 </p>
 
-<h1 align="center">DripPay</h1>
+<h1 align="center">Umbra Pay</h1>
 
 <p align="center">
-  <strong>Privacy-first on-chain payroll. Salaries nobody can see. Payments everyone can trust.</strong>
-</p>
-
-<p align="center">
-  <a href="https://drip-payy.xyz">Live App</a> &middot;
-  <a href="https://drip-payy.xyz/docs">Documentation</a> &middot;
-  <a href="https://sepolia.etherscan.io/address/0xE7121d656dc7DF514242Ba516AE8a8e061d3336A">Deployed on Sepolia</a> &middot;
-  Built with <a href="https://docs.zama.ai/fhevm">Zama fhEVM</a>
+  <strong>Privacy-first on-chain payroll powered by Flare Confidential Compute (FCC) TEEs.</strong>
 </p>
 
 <p align="center">
-  <img src="drippayreviewimg.png" alt="DripPay Landing Page" width="800" />
+  <a href="https://coston2-explorer.flare.network/address/0x8C00cab72b52644c0F98570c5DC094E3E214B241">Coston2 Factory</a> &middot;
+  <a href="https://sepolia.etherscan.io/address/0x294dB937C2b9f02A29987472a3F16918a08d1185">Sepolia Vault</a> &middot;
+  Built with <a href="https://flare.network">Flare Confidential Compute</a>
 </p>
 
 ---
 
 ## The Problem
 
-Payroll on-chain sounds great until you realize **everyone can see what everyone earns**. Every salary, every payment, every balance public on the blockchain for anyone to inspect. That's not how the real world works, and it shouldn't be how web3 works either.
+Payroll on-chain sounds great until you realize **everyone can see what everyone earns**. Every salary, payment, and balance is public on the blockchain for anyone to inspect. That's not how the real world works, and it shouldn't be how Web3 works either.
 
 ## The Solution
 
-DripPay uses **Fully Homomorphic Encryption (FHE)** to make on-chain payroll actually private. Salaries are encrypted _before_ they hit the chain. The contract does math on encrypted numbers adds salaries to balances, compares withdrawal amounts without ever decrypting them. Only the individual employee can decrypt their own balance, client-side, with their wallet.
+Umbra Pay uses **Flare Confidential Compute (FCC)** and isolated **Trusted Execution Environments (TEEs)** to make on-chain payroll truly private and instant. 
 
-**Not even the blockchain validators can see what you earn.**
+Instead of heavy, slow homomorphic operations or complex keypair re-encryption, Umbra Pay executes salary privacy, solvency attestation, and payout allocations inside isolated hardware enclave environments.
+
+- **Private Salary Storage**: Salary payloads are encrypted and managed inside hardware TEE isolation.
+- **Hardware-Attested Solvency**: Employers can prove total payroll solvency without revealing individual compensation amounts.
+- **Two-Chain Architecture**:
+  - **Coston2 (Chain ID 114)**: Fast, low-cost coordination chain for org deployment, employee management, and payroll batch execution.
+  - **Ethereum Sepolia (Chain ID 11155111)**: Secure money chain where direct native ETH deposits land and enclave-signed withdrawal settlement transactions execute.
 
 ---
 
 ## How It Works
 
 ```
-Employer                          Smart Contract                      Employee
-   |                                    |                                 |
-   |-- Create Organization ------------>|                                 |
-   |                                    |                                 |
-   |-- Add Employee (encrypted salary)->|  FHE.allow(salary, employee)    |
-   |                                    |  FHE.allow(salary, admin)       |
-   |                                    |                                 |
-   |-- Deposit ETH/ERC-20 ------------>|                                 |
-   |                                    |                                 |
-   |-- Run Payroll -------------------->|  balance += salary (encrypted)  |
-   |                                    |                                 |
-   |                                    |<--- Decrypt Balance ------------|
-   |                                    |     (wallet signature + FHE)    |
-   |                                    |                                 |
-   |                                    |<--- Withdraw ------------------|
-   |                                    |     (real tokens transferred)   |
+Employer                          Coston2 / TEE Enclave                   Employee
+   |                                        |                                 |
+   |-- Create Organization ---------------->| (UmbraOrgFactory)              |
+   |                                        |                                 |
+   |-- Add Employee (Encrypted Salary) ---->| (UmbraOrg & TEE Enclave State)  |
+   |                                        |                                 |
+   |-- Deposit Native ETH (Sepolia Vault) ->| (TEE Hardware Vault)            |
+   |                                        |                                 |
+   |-- Run Payroll (Coston2) -------------->| (TEE Ledger Balance Update)     |
+   |                                        |                                 |
+   |                                        |<--- Request Withdrawal ---------|
+   |                                        |     (Enclave verifies balance)  |
+   |                                        |                                 |
+   |                                        |==== Native Sepolia Settlement =>|
+   |                                              (Enclave-Signed ETH Tx)
 ```
 
-1. **Employer creates an organization** — deploys a contract, picks ETH or ERC-20 for payments
-2. **Adds employees with encrypted salaries** — salary amounts are encrypted client-side before the transaction. The contract stores only `euint64` ciphertext
-3. **Deposits funds** — real ETH or tokens go into the contract pool
-4. **Runs payroll** — one click, the contract adds each employee's encrypted salary to their encrypted balance. All math happens on ciphertext
-5. **Employees see their org automatically** — wallet connect, and the factory tells them which orgs they belong to. No contract address needed
-6. **Employees decrypt & withdraw** — sign a re-encryption request with their wallet, decrypt client-side, withdraw real tokens
+1. **Employer creates an organization** on Flare Coston2 via `UmbraOrgFactory.sol`.
+2. **Adds employees with encrypted salaries** — salary details are serialized into encrypted payloads and synced to the Coston2 contract and TEE Enclave API.
+3. **Deposits funds** — plain native ETH is deposited directly to the TEE Vault address on **Ethereum Sepolia** (`0x294dB937C2b9f02A29987472a3F16918a08d1185`).
+4. **Runs payroll** — one click on Coston2 updates the batch state and triggers hardware-enclave ledger balance allocations.
+5. **Employees withdraw confidentially** — requests withdrawal on Coston2, and the TEE hardware enclave signs and broadcasts a native ETH settlement transaction on **Ethereum Sepolia**.
 
 ---
 
 ## Tech Stack
 
-| Layer          | Technology                                             |
-| -------------- | ------------------------------------------------------ |
-| **Encryption** | [Zama fhEVM](https://docs.zama.ai/fhevm) (TFHE on EVM) |
-| **Network**    | Ethereum Sepolia + Zama coprocessor                    |
-| **Contracts**  | Solidity 0.8.27, Hardhat, OpenZeppelin                 |
-| **Frontend**   | Next.js 16, React 19, TypeScript                       |
-| **Styling**    | Tailwind CSS v4, Framer Motion                         |
-| **Wallet**     | wagmi v2, viem, RainbowKit                             |
-| **FHE Client** | fhevmjs (encrypt inputs, decrypt outputs)              |
-| **Fonts**      | Bricolage Grotesque + Plus Jakarta Sans                |
+| Layer | Technology |
+| :--- | :--- |
+| **TEE Enclave** | [Flare Confidential Compute (FCC)](https://flare.network) isolated hardware environment |
+| **Coordination Chain** | Flare Coston2 Testnet (Chain ID 114) |
+| **Settlement Chain** | Ethereum Sepolia (Chain ID 11155111) |
+| **Contracts** | Solidity 0.8.27, Hardhat, Ethers v6 |
+| **Frontend** | Next.js 16, React 19, TypeScript, Webpack |
+| **Styling** | Tailwind CSS v4, Framer Motion |
+| **Wallet** | wagmi v2, viem, RainbowKit |
 
 ---
 
-## Project Structure
+## Smart Contracts (Coston2 Testnet)
 
-```
-DripPay/
-├── contract/                    # Solidity smart contracts
-│   ├── contracts/
-│   │   ├── OrganizationFactory.sol   # Deploys orgs, indexes employees
-│   │   ├── Organization.sol          # Payroll logic, FHE operations
-│   │   └── TestToken.sol             # Mock ERC-20 for testing
-│   ├── scripts/deploy.ts            # Deployment script
-│   └── hardhat.config.ts
-│
-├── frontend/                    # Next.js application
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── dashboard/            # Employer org list
-│   │   │   ├── dashboard/[address]/  # Org detail dashboard
-│   │   │   ├── employee/             # Employee org list
-│   │   │   ├── employee/[address]/   # Employee balance view
-│   │   │   ├── docs/                 # Documentation (gitbook-style)
-│   │   │   ├── not-found.tsx         # Custom 404 page
-│   │   │   └── api/chat/             # AI chatbot API
-│   │   ├── components/
-│   │   │   ├── dashboard/            # Employer components
-│   │   │   ├── employee/             # Employee components
-│   │   │   ├── landing/              # Landing page sections
-│   │   │   └── shared/               # Shared (Modal, Confetti, etc.)
-│   │   ├── hooks/                    # useOrganization, useFhevm, useEthPrice
-│   │   └── lib/                      # Contracts, ABIs, animations
-│   └── public/
-│
-└── README.md                    # You are here
-```
-
----
-
-## Smart Contracts
-
-### OrganizationFactory
-
-The entry point. Deploys new Organization contracts and maintains a registry of which employees belong to which orgs.
-
-| Function                             | Description                                   |
-| ------------------------------------ | --------------------------------------------- |
-| `createOrg(name, paymentToken)`      | Deploy a new org. `address(0)` = ETH payments |
-| `getOrganizations(admin)`            | Get all orgs an admin created                 |
-| `getEmployeeOrganizations(employee)` | Get all orgs an employee belongs to           |
-
-### Organization
-
-Where the magic happens. All salary and balance data is encrypted on-chain using Zama's TFHE library.
-
-| Function                                            | Who      | Description                                               |
-| --------------------------------------------------- | -------- | --------------------------------------------------------- |
-| `addEmployees(addresses, encryptedSalaries, proof)` | Admin    | Add employees with FHE-encrypted salaries                 |
-| `removeEmployee(address)`                           | Admin    | Remove an employee                                        |
-| `runPayroll()`                                      | Admin    | Add salary to every employee's balance (all encrypted)    |
-| `deposit(amount)`                                   | Anyone   | Fund the org's payment pool                               |
-| `withdraw(amount)`                                  | Employee | Withdraw from accumulated balance                         |
-| `balanceOf(employee)`                               | View     | Get encrypted balance handle for client-side decryption   |
-| `salaryOf(employee)`                                | View     | Get encrypted salary handle for admin/employee decryption |
-| `getTotalPayrollCost()`                             | View     | Get encrypted sum of all salaries                         |
-| `updateSalary(employee, encSalary, proof)`          | Admin    | Update an employee's encrypted salary                     |
-| `checkBudget()`                                     | Admin    | FHE comparison: does balance cover total payroll?         |
-
-**Key FHE operations in `runPayroll()`:**
-
-```solidity
-// This addition happens on encrypted values — nobody sees the amounts
-euint64 newBalance = FHE.add(_balances[emp], _salaries[emp]);
-```
+| Contract | Address |
+| :--- | :--- |
+| **UmbraOrgFactory** | [`0x8C00cab72b52644c0F98570c5DC094E3E214B241`](https://coston2-explorer.flare.network/address/0x8C00cab72b52644c0F98570c5DC094E3E214B241) |
+| **Demo UmbraOrg** | [`0x89E6fBd9B415D6E16b2cbeD92D4924659B8e9D94`](https://coston2-explorer.flare.network/address/0x89E6fBd9B415D6E16b2cbeD92D4924659B8e9D94) |
+| **TEE Vault Address (Sepolia)** | `0x294dB937C2b9f02A29987472a3F16918a08d1185` |
 
 ---
 
@@ -157,181 +91,33 @@ euint64 newBalance = FHE.add(_balances[emp], _salaries[emp]);
 ### Prerequisites
 
 - Node.js 18+
-- pnpm
-- A wallet with Sepolia ETH ([faucet](https://sepoliafaucet.com))
+- pnpm or npm
+- Wallet connected to Flare Coston2 and Ethereum Sepolia testnets
 
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/your-username/DripPay.git
-cd DripPay
+git clone https://github.com/martinvibes/DripPay.git UmbraPay
+cd UmbraPay
 
 # Install contract dependencies
-cd contract && pnpm install
+cd contract && npm install
 
 # Install frontend dependencies
-cd ../frontend && pnpm install
+cd ../frontend && npm install
 ```
 
-### 2. Environment Setup
-
-```bash
-# Contract — create .env
-cp contract/.env.example contract/.env
-# Add your DEPLOYER_PRIVATE_KEY and INFURA_API_KEY
-
-# Frontend — create .env
-cp frontend/.env.example frontend/.env
-# Add your NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
-```
-
-### 3. Deploy Contracts (optional — already deployed on Sepolia)
-
-```bash
-cd contract
-npx hardhat compile
-npx hardhat run scripts/deploy.ts --network sepolia
-```
-
-Current deployment:
-
-- **OrganizationFactory**: [`0xE7121d656dc7DF514242Ba516AE8a8e061d3336A`](https://sepolia.etherscan.io/address/0xE7121d656dc7DF514242Ba516AE8a8e061d3336A)
-
-Copy the factory address to `frontend/.env`:
-
-```
-NEXT_PUBLIC_FACTORY_ADDRESS=0xE7121d656dc7DF514242Ba516AE8a8e061d3336A
-```
-
-### 4. Run Frontend
+### 2. Run Frontend Development Server
 
 ```bash
 cd frontend
-pnpm dev
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## User Flows
-
-### As an Employer
-
-1. Connect wallet on `/dashboard`
-2. Create a new organization (name, ETH or ERC-20, payroll cycle)
-3. Add employees - enter wallet addresses and salary amounts (FHE-encrypted before tx). Supports CSV bulk import.
-4. Deposit funds into the org contract
-5. Click "Reveal Salaries" to bulk-decrypt all salaries with one wallet signature
-6. Click "Execute Payroll" - encrypted salaries credited to all employees with confetti celebration
-7. View payroll schedule with countdown to next payroll date
-8. Update salaries, check budget, download receipts, export history (PDF/CSV)
-9. Each org has a unique URL (`/dashboard/0x...`) - bookmarkable and refresh-safe
-
-### As an Employee
-
-1. Connect wallet on `/employee`
-2. Your organizations appear automatically (auto-discovery, no contract address needed)
-3. Click an org - navigates to `/employee/0x...` (bookmarkable)
-4. "Decrypt & View" - sign with your wallet, see your actual balance with USD estimate
-5. Download payslips per payroll run (dark/light PDF themes)
-6. Withdraw funds and export transaction history whenever you want
-
----
-
-## The FHE Part (for the curious)
-
-Traditional smart contracts store everything in plaintext. Anyone with an Etherscan link can see every balance and every transfer. DripPay changes this:
-
-**Encryption (employer adding salary):**
-
-```typescript
-const instance = await getFhevmInstance();
-const input = instance.createEncryptedInput(contractAddress, userAddress);
-input.add64(salaryInWei);
-const encrypted = await input.encrypt();
-// encrypted.handles[0] and encrypted.inputProof go to the contract
-```
-
-**On-chain math (contract running payroll):**
-
-```solidity
-// FHE.add operates on ciphertext — the EVM never sees plaintext
-_balances[emp] = FHE.add(_balances[emp], _salaries[emp]);
-```
-
-**Decryption (employee viewing balance):**
-
-```typescript
-const { publicKey, privateKey } = instance.generateKeypair();
-const eip712 = instance.createEIP712(publicKey, [contractAddress], timestamp, 1);
-const signature = await wallet.signTypedData(eip712);
-const result = await instance.userDecrypt([{ handle, contractAddress }], ...);
-// Only this employee can see the result
-```
-
-The key insight: **the contract can do arithmetic on encrypted values without ever decrypting them.** The Zama coprocessor handles the homomorphic operations, and the result is a new ciphertext that only authorized parties (the employee + admin) can decrypt.
-
----
-
-## Design
-
-DripPay uses a **"Refined Noir"** aesthetic a pure dark background (`#09090b`) with a single green accent (`#00e5a0`). No rainbow gradients, no multi-color chaos. The UI is designed to feel like a premium fintech product, not a hackathon prototype.
-
-- **Typography**: Bricolage Grotesque for headings, Plus Jakarta Sans for body
-- **Animations**: Framer Motion with staggered reveals, spring physics, and subtle hover states
-- **Mobile-first**: Fully responsive down to 400px card layouts on mobile, tables on desktop
-- **Dark mode only**: Because payroll apps should look serious
-
----
-
-## Hackathon
-
-Built for **PL Genesis: Frontiers of Collaboration** (March 2026).
-
-**Target Bounties:**
-
-- **Zama** — Confidential Blockchain Protocol
-- **Crecimiento** — Bring Argentina Onchain
-- **Funding the Commons** — Bridge Between Builders
-- **Fresh Code Track** — $50,000 pool
-
----
-
-## What's Next
-
-### Completed
-
-- [x] Encrypted salary storage and batch payroll (FHE.add on ciphertext)
-- [x] Employee auto-discovery (factory indexes employees, no CA sharing needed)
-- [x] Salary reveal for admins (bulk "Reveal All Salaries" with one wallet signature)
-- [x] Encrypted total payroll cost (FHE sum of all salaries, admin-decryptable)
-- [x] Confidential budget check (FHE comparison: balance vs total payroll)
-- [x] Salary updates (re-encrypt and update any employee's salary)
-- [x] Encrypted payslips and receipts (per-event, dark/light PDF themes)
-- [x] Full history export (PDF and CSV with formatted reports)
-- [x] Interactive demo mode (guided 4-step walkthrough, no wallet needed)
-- [x] Multi-currency USD estimates (live ETH/USD price from CoinGecko)
-- [x] Payroll scheduling (one-time, weekly, bi-weekly, monthly with countdown)
-- [x] Confetti celebration on payroll execution
-- [x] URL-based routing (/dashboard/[address], /employee/[address]) - bookmarkable, refresh-safe
-- [x] Custom 404 page with DripPay branding
-- [x] Comprehensive documentation (/docs) with gitbook-style sidebar navigation
-- [x] AI chatbot assistant with knowledge of all DripPay features
-- [x] Per-employee delete with on-chain confirmation tracking
-- [x] Wallet disconnect detection on detail pages
-
-### Roadmap
-
-- [ ] **Phase 2: Verifiable Income Proofs** - The biggest unsolved problem in confidential payroll. Salaries are private, but employees still need to _prove_ their income to banks, landlords, embassies, and lenders. We plan to integrate ZK attestations so employees can generate proofs like "my salary is above $X/month" without revealing the exact amount. The flow: decrypt salary client-side, generate a ZK proof (Circom/Noir) over the plaintext, third parties verify the proof on-chain against the encrypted handle. This bridges FHE privacy with real-world verifiability.
-- [ ] **Phase 3: Confidential Fundraising** - Teams and DAOs raise funds on-chain with individual contribution amounts encrypted, but totals publicly verifiable using FHE aggregation
-- [ ] Recurring payroll auto-execution via Chainlink Automation
-- [ ] Multi-sig admin support (require N-of-M approvals to run payroll)
-- [ ] ERC-7984 token integration
-- [ ] Mainnet deployment
-
----
-
 <p align="center">
-  <sub>Salaries are private. Payments are trustless. That's DripPay.</sub>
+  <sub>Salaries are private. Payments are trustless. That's Umbra Pay.</sub>
 </p>

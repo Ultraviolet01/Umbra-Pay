@@ -506,7 +506,7 @@ function CinematicPayslip({ visible }: { visible: boolean }) {
               Block #18,294,021
             </span>
             <span className="text-[9px] text-[#00e5a0] font-bold">
-              Zama fhEVM
+              Flare TEE
             </span>
           </div>
         </div>
@@ -1051,7 +1051,7 @@ export default function LandingA() {
             className="mt-6 flex items-center justify-center gap-8 text-xs text-[var(--text-muted)]"
           >
             {[
-              { icon: Lock, text: "256-bit FHE" },
+              { icon: Lock, text: "TEE Enclave" },
               { icon: EyeOff, text: "Zero data leaks" },
               { icon: Shield, text: "100% on-chain" },
             ].map((badge, i) => (
@@ -1157,7 +1157,7 @@ export default function LandingA() {
               transition={{ delay: 0.4, duration: 0.8, ease: EASE }}
               className="text-lg text-[var(--text-secondary)] mb-12 max-w-xl mx-auto"
             >
-              Deploy private payroll in minutes on Ethereum Sepolia. Your team
+              Deploy private payroll in minutes using Flare confidential compute. Your team
               deserves confidential compensation.
             </motion.p>
 
@@ -1191,7 +1191,7 @@ export default function LandingA() {
               transition={{ delay: 0.9, duration: 1 }}
               className="mt-16 text-xs text-[var(--text-muted)]"
             >
-              Powered by Zama fhEVM &middot; Built on Ethereum
+              Powered by Flare TEE Enclave &middot; Built on Ethereum
             </motion.p>
           </motion.div>
         </div>
@@ -1200,7 +1200,7 @@ export default function LandingA() {
         <div className="absolute bottom-0 left-0 right-0 border-t border-[rgba(255,255,255,0.04)] py-6 px-6">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-[var(--text-muted)]">
-              DripPay &mdash; Privacy-first on-chain payroll
+              Umbra Pay &mdash; Privacy-first on-chain payroll
             </p>
             <div className="flex items-center gap-6 text-xs text-[var(--text-muted)]">
               <Link

@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { AppNav } from "@/components/shared/AppNav";
 import { WalletConnect } from "@/components/shared/WalletConnect";
 import { useEmployeeOrganizations } from "@/hooks/useOrganization";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
+import { UMBRA_ORG_ABI } from "@/lib/contracts";
 import {
   Hexagon,
   Ring,
@@ -84,7 +84,7 @@ export default function EmployeeListPage() {
         orgToVerify.startsWith("0x") && orgToVerify.length === 42
           ? orgToVerify
           : undefined,
-      abi: ORGANIZATION_ABI,
+      abi: UMBRA_ORG_ABI,
       functionName: "isEmployee",
       args: connectedAddress ? [connectedAddress] : undefined,
       query: {
@@ -329,7 +329,7 @@ export default function EmployeeListPage() {
                 {/* Feature pills */}
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   {[
-                    { icon: Lock, text: "FHE Encrypted" },
+                    { icon: Lock, text: "TEE Protected" },
                     { icon: Fingerprint, text: "Wallet-signed" },
                     { icon: Eye, text: "Only you can see" },
                   ].map((item, i) => (
@@ -381,7 +381,7 @@ export default function EmployeeListPage() {
                   className="text-sm text-[var(--text-secondary)]"
                 >
                   {savedOrgs.length > 0
-                    ? "Select an organization to view your encrypted balance"
+                    ? "Select an organization to view your confidential TEE balance"
                     : "Organizations you belong to will appear here automatically"}
                 </motion.p>
               </div>
@@ -538,26 +538,18 @@ function OrgCard({
 }) {
   const { data: name } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
+    abi: UMBRA_ORG_ABI,
     functionName: "name",
-    query: { enabled: true },
-  });
-
-  const { data: paymentTokenAddr } = useReadContract({
-    address: orgAddress,
-    abi: ORGANIZATION_ABI,
-    functionName: "paymentToken",
     query: { enabled: true },
   });
 
   const { data: createdAt } = useReadContract({
     address: orgAddress,
-    abi: ORGANIZATION_ABI,
+    abi: UMBRA_ORG_ABI,
     functionName: "createdAt",
     query: { enabled: true },
   });
 
-  const isETH = !paymentTokenAddr || paymentTokenAddr === ZERO_ADDRESS;
   const displayName =
     (name as string) || `${orgAddress.slice(0, 6)}...${orgAddress.slice(-4)}`;
   const createdDate = createdAt
@@ -605,7 +597,7 @@ function OrgCard({
         <div className="flex items-center gap-3 shrink-0">
           <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-2.5 py-1 text-[10px] font-medium text-[var(--text-muted)]">
             <Lock className="h-2.5 w-2.5 text-[var(--accent)]" />
-            {isETH ? "ETH" : "ERC-20"}
+            Native ETH
           </span>
           <ChevronRight className="h-4 w-4 text-[var(--text-muted)] group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition-all" />
         </div>

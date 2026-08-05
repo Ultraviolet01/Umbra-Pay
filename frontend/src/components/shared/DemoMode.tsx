@@ -77,7 +77,7 @@ function EncryptAnimation({ text, delay = 0 }: { text: string; delay?: number })
             className="flex items-center gap-1 text-[var(--accent)]"
           >
             <Lock className="h-3 w-3" />
-            <span className="tracking-wider">FHE(****)</span>
+            <span className="tracking-wider">TEE(****)</span>
           </motion.span>
         )}
       </AnimatePresence>
@@ -205,7 +205,7 @@ function StepRunPayroll() {
           <span className="text-xs text-[var(--text-secondary)]">Total salaries</span>
           <span className="flex items-center gap-1 text-xs text-[var(--accent)]">
             <Lock className="h-3 w-3" />
-            <span className="font-mono">FHE(****)</span>
+            <span className="font-mono">TEE(****)</span>
           </span>
         </div>
         <div className="flex items-center justify-between">
@@ -233,7 +233,7 @@ function StepRunPayroll() {
             className="rounded-lg bg-[rgba(0,229,160,0.06)] border border-[var(--border-accent)] px-3 py-2 text-center"
           >
             <p className="text-xs text-[var(--accent)] font-medium">
-              All balances updated with FHE.add() - no salary amounts revealed
+              All balances updated inside TEE enclave - no salary amounts revealed
             </p>
           </motion.div>
         )}
@@ -299,7 +299,7 @@ function StepViewBalance() {
       <div className="rounded-lg bg-[rgba(0,229,160,0.04)] border border-[var(--border-accent)] px-3 py-2.5">
         <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
           Only Alice can see her own balance. The employer sees encrypted values.
-          Client-side decryption using fhevmjs ensures true privacy.
+          Client-side decryption using EIP-712 enclave signatures ensures true privacy.
         </p>
       </div>
     </div>
@@ -317,7 +317,7 @@ const STEPS: DemoStep[] = [
   {
     id: "add",
     title: "Add Employees",
-    description: "Salaries are FHE-encrypted before being stored onchain",
+    description: "Salaries are TEE-encrypted before being stored onchain",
     icon: UserPlus,
     content: <StepAddEmployees />,
   },
@@ -402,7 +402,7 @@ export function DemoMode({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                           className="text-lg font-bold"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
-                          DripPay Demo
+                          Umbra Pay Demo
                         </h3>
                         <p className="text-[11px] text-[var(--text-muted)]">
                           Interactive walkthrough - no wallet needed

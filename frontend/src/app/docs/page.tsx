@@ -1,61 +1,53 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
-import { Logo } from "@/components/shared/Logo";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
-  Menu,
-  X,
-  Rocket,
+  BookOpen,
   Building2,
   User,
-  FileCode2,
+  Shield,
   Lock,
-  Sparkles,
+  Cpu,
+  Layers,
   HelpCircle,
   ChevronRight,
-  Shield,
-  ArrowLeft,
-  CheckCircle2,
+  Check,
+  Copy,
   Info,
   Lightbulb,
-  Eye,
-  CreditCard,
+  CheckCircle2,
+  Menu,
+  X,
+  ArrowLeft,
   FileText,
-  Calculator,
-  CalendarDays,
   FileDown,
+  Calculator,
   Search,
+  CreditCard,
+  Eye,
   Globe,
+  CalendarDays,
   Zap,
   PartyPopper,
-  Layers,
-  Copy,
-  Check,
 } from "lucide-react";
+import { Logo } from "@/components/shared/Logo";
 
-/* ─── Types ─── */
-interface SidebarSection {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-}
-
-/* ─── Sidebar sections ─── */
-const sections: SidebarSection[] = [
-  { id: "getting-started", label: "Getting Started", icon: <Rocket className="w-4 h-4" /> },
+/* ─── Documentation Section Metadata ─── */
+const sections = [
+  { id: "getting-started", label: "Getting Started", icon: <BookOpen className="w-4 h-4" /> },
   { id: "for-employers", label: "For Employers", icon: <Building2 className="w-4 h-4" /> },
   { id: "for-employees", label: "For Employees", icon: <User className="w-4 h-4" /> },
-  { id: "smart-contracts", label: "Smart Contracts", icon: <FileCode2 className="w-4 h-4" /> },
-  { id: "fhe-encryption", label: "FHE Encryption", icon: <Lock className="w-4 h-4" /> },
-  { id: "features", label: "Features", icon: <Sparkles className="w-4 h-4" /> },
-  { id: "use-cases", label: "Use Cases", icon: <Globe className="w-4 h-4" /> },
+  { id: "smart-contracts", label: "Smart Contracts", icon: <Shield className="w-4 h-4" /> },
+  { id: "tee-privacy", label: "TEE Privacy & FCC", icon: <Lock className="w-4 h-4" /> },
+  { id: "features", label: "Features", icon: <Cpu className="w-4 h-4" /> },
+  { id: "use-cases", label: "Use Cases", icon: <Layers className="w-4 h-4" /> },
   { id: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
 ];
 
 /* ─── Code Block Component ─── */
-function CodeBlock({ code, language = "typescript" }: { code: string; language?: string }) {
+function CodeBlock({ code, language = "solidity" }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -64,25 +56,18 @@ function CodeBlock({ code, language = "typescript" }: { code: string; language?:
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Basic syntax highlighting via spans
   const highlightSyntax = (raw: string) => {
     const lines = raw.split("\n");
     return lines.map((line, i) => {
       let highlighted = line
-        // Comments
         .replace(/(\/\/.*$)/gm, '<span class="code-comment">$1</span>')
-        // Strings
         .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g, '<span class="code-string">$1</span>')
-        // Keywords
         .replace(
-          /\b(import|from|export|const|let|var|function|return|async|await|new|if|else|for|while|class|extends|implements|interface|type|enum|public|private|protected|static|readonly|void|null|undefined|true|false|pragma|solidity|contract|mapping|address|uint64|uint256|event|emit|require|msg|this|memory|storage|calldata|external|internal|view|pure|payable|returns)\b/g,
+          /\b(import|from|export|const|let|var|function|return|async|await|new|if|else|for|while|class|extends|implements|interface|type|enum|public|private|protected|static|readonly|void|null|undefined|true|false|pragma|solidity|contract|mapping|address|uint256|event|emit|require|msg|this|memory|storage|calldata|external|internal|view|pure|payable|returns)\b/g,
           '<span class="code-keyword">$1</span>'
         )
-        // Functions
         .replace(/\b([a-zA-Z_]\w*)\s*(?=\()/g, '<span class="code-function">$1</span>')
-        // Types / classes (capitalized words)
-        .replace(/\b(TFHE|FHE|euint64|ebool|einput|bytes32|Organization|OrganizationFactory|GatewayCaller)\b/g, '<span class="code-type">$1</span>')
-        // Numbers
+        .replace(/\b(UmbraOrg|UmbraOrgFactory|bytes32|uint256|address)\b/g, '<span class="code-type">$1</span>')
         .replace(/\b(\d+)\b/g, '<span class="code-number">$1</span>');
 
       return (
@@ -126,7 +111,6 @@ function CodeBlock({ code, language = "typescript" }: { code: string; language?:
   );
 }
 
-/* ─── Tip / Info box ─── */
 function TipBox({ children, variant = "info" }: { children: React.ReactNode; variant?: "info" | "tip" | "warning" }) {
   const styles = {
     info: { border: "var(--border-accent)", bg: "rgba(0,229,160,0.04)", icon: <Info className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} /> },
@@ -142,7 +126,6 @@ function TipBox({ children, variant = "info" }: { children: React.ReactNode; var
   );
 }
 
-/* ─── Section heading ─── */
 function SectionHeading({ id, children }: { id: string; children: React.ReactNode }) {
   return (
     <motion.h2
@@ -159,7 +142,6 @@ function SectionHeading({ id, children }: { id: string; children: React.ReactNod
   );
 }
 
-/* ─── Sub-heading ─── */
 function SubHeading({ children }: { children: React.ReactNode }) {
   return (
     <h3
@@ -171,7 +153,6 @@ function SubHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ─── Paragraph ─── */
 function P({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-sm sm:text-base mb-4" style={{ color: "var(--text-secondary)", lineHeight: 1.75 }}>
@@ -180,7 +161,6 @@ function P({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ─── Bullet list with green checks ─── */
 function BulletList({ items }: { items: (string | React.ReactNode)[] }) {
   return (
     <ul className="space-y-2 my-4">
@@ -194,7 +174,6 @@ function BulletList({ items }: { items: (string | React.ReactNode)[] }) {
   );
 }
 
-/* ─── Key function table ─── */
 function FunctionTable({ rows }: { rows: { fn: string; desc: string }[] }) {
   return (
     <div className="overflow-x-auto my-4 rounded-xl border" style={{ borderColor: "var(--border)" }}>
@@ -218,7 +197,6 @@ function FunctionTable({ rows }: { rows: { fn: string; desc: string }[] }) {
   );
 }
 
-/* ─── FAQ Item ─── */
 function FAQItem({ question, answer }: { question: string; answer: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
@@ -253,7 +231,6 @@ function FAQItem({ question, answer }: { question: string; answer: React.ReactNo
   );
 }
 
-/* ─── Feature card ─── */
 function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
     <motion.div
@@ -276,20 +253,15 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: stri
   );
 }
 
-/* ═══════════════════════════════════════════
-   MAIN DOCS PAGE
-   ═══════════════════════════════════════════ */
 export default function DocsPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("getting-started");
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  /* ─── Intersection observer for active section tracking ─── */
   useEffect(() => {
     const callback: IntersectionObserverCallback = (entries) => {
       const visible = entries.filter((e) => e.isIntersecting);
       if (visible.length > 0) {
-        // Pick the one closest to top
         const sorted = visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         setActiveSection(sorted[0].target.id);
       }
@@ -316,7 +288,6 @@ export default function DocsPage() {
     }
   }, []);
 
-  /* ─── Sidebar content ─── */
   const SidebarContent = () => (
     <nav className="flex flex-col gap-0.5 px-3 py-4">
       <div className="px-3 mb-4">
@@ -376,7 +347,6 @@ export default function DocsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-deep)" }}>
-      {/* ─── Top bar ─── */}
       <header
         className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 h-14 border-b"
         style={{ background: "rgba(6,6,8,0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderColor: "var(--border)" }}
@@ -409,7 +379,6 @@ export default function DocsPage() {
         </div>
       </header>
 
-      {/* ─── Mobile sidebar drawer ─── */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
@@ -435,7 +404,6 @@ export default function DocsPage() {
         )}
       </AnimatePresence>
 
-      {/* ─── Desktop sidebar ─── */}
       <aside
         className="hidden sm:block fixed top-14 left-0 bottom-0 w-[260px] overflow-y-auto"
         style={{ background: "var(--bg-primary)", borderRight: "1px solid var(--border)" }}
@@ -443,36 +411,32 @@ export default function DocsPage() {
         <SidebarContent />
       </aside>
 
-      {/* ─── Main content ─── */}
       <main className="pt-14 sm:pl-[260px]">
         <div className="max-w-3xl mx-auto px-5 sm:px-8 lg:px-12 py-8 sm:py-12 pb-24">
 
-          {/* ═══ GETTING STARTED ═══ */}
+          {/* GETTING STARTED */}
           <SectionHeading id="getting-started">
-            <span className="gradient-text">Getting Started</span> with DripPay
+            <span className="gradient-text">Getting Started</span> with Umbra Pay
           </SectionHeading>
 
-          <SubHeading>What is DripPay?</SubHeading>
+          <SubHeading>What is Umbra Pay?</SubHeading>
           <P>
-            DripPay is a <strong style={{ color: "var(--text-primary)" }}>privacy-first on-chain payroll platform</strong> built on{" "}
-            <strong style={{ color: "var(--text-primary)" }}>Fully Homomorphic Encryption (FHE)</strong>. It lets organizations run
-            payroll entirely on-chain while keeping salary amounts, balances, and disbursements fully encrypted. Nobody can see what
-            anyone earns — not even the blockchain itself.
+            Umbra Pay is a <strong style={{ color: "var(--text-primary)" }}>privacy-first on-chain payroll platform</strong> powered by{" "}
+            <strong style={{ color: "var(--text-primary)" }}>Flare Confidential Compute (FCC)</strong>. It allows organizations to coordinate payroll on-chain while keeping salary amounts and payouts strictly private inside hardware-isolated Trusted Execution Environments (TEEs).
           </P>
           <P>
-            Built on Ethereum Sepolia with the Zama fhEVM coprocessor, DripPay performs real computations on encrypted data.
-            Salaries are added, balances are updated, and budget checks are performed — all without ever decrypting the underlying values on-chain.
+            Using a two-chain architecture, Umbra Pay uses <strong style={{ color: "var(--text-primary)" }}>Flare Coston2</strong> as the fast coordination network and <strong style={{ color: "var(--text-primary)" }}>Ethereum Sepolia</strong> as the native money settlement chain.
           </P>
 
           <SubHeading>How It Works</SubHeading>
-          <P>The DripPay flow is straightforward:</P>
+          <P>The Umbra Pay flow is straightforward:</P>
           <div className="my-4 flex flex-col gap-3">
             {[
-              { step: "1", title: "Create Organization", desc: "Employer deploys a payroll smart contract, choosing ETH or ERC-20 payments." },
-              { step: "2", title: "Add Employees", desc: "Enter wallet addresses and salary amounts. Salaries are encrypted client-side with FHE before touching the chain." },
-              { step: "3", title: "Deposit Funds", desc: "Fund the contract with ETH or tokens to cover payroll." },
-              { step: "4", title: "Run Payroll", desc: "One click triggers batch payment. All arithmetic happens on encrypted values." },
-              { step: "5", title: "Employees Withdraw", desc: "Employees decrypt their balance with a wallet signature and withdraw real ETH/tokens." },
+              { step: "1", title: "Create Organization", desc: "Employer deploys an UmbraOrg smart contract on Flare Coston2." },
+              { step: "2", title: "Add Employees", desc: "Enter wallet addresses and salary amounts. Salaries are encrypted and synced with the TEE Enclave API." },
+              { step: "3", title: "Deposit Native ETH", desc: "Employer deposits native ETH directly to the TEE Vault address on Ethereum Sepolia." },
+              { step: "4", title: "Run Payroll", desc: "Executing payroll on Coston2 updates the enclave ledger balances in hardware TEE isolation." },
+              { step: "5", title: "Enclave Settlement", desc: "Employees request withdrawals, and the enclave signs and broadcasts native ETH settlement transactions directly to Sepolia." },
             ].map((item) => (
               <motion.div
                 key={item.step}
@@ -500,538 +464,124 @@ export default function DocsPage() {
           <SubHeading>Prerequisites</SubHeading>
           <BulletList
             items={[
-              "A browser wallet (MetaMask, Rainbow, Coinbase Wallet, etc.)",
-              "Sepolia ETH for gas fees and payroll funding",
-              "A modern browser with JavaScript enabled (Chrome, Firefox, Brave, Edge)",
+              "A Web3 wallet (MetaMask, Rainbow, Coinbase Wallet, etc.)",
+              "Coston2 C2ETH for gas fees on Flare Coston2",
+              "Ethereum Sepolia ETH for funding employer deposits",
             ]}
           />
 
           <TipBox variant="tip">
-            Need Sepolia ETH? Visit the{" "}
-            <a
-              href="https://cloud.google.com/application/web3/faucet/ethereum/sepolia"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline transition-colors"
-              style={{ color: "var(--accent)" }}
-            >
-              Google Cloud Sepolia Faucet
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://www.alchemy.com/faucets/ethereum-sepolia"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline transition-colors"
-              style={{ color: "var(--accent)" }}
-            >
-              Alchemy Sepolia Faucet
-            </a>{" "}
-            to get free test ETH.
+            Need Coston2 C2ETH or Sepolia ETH? Visit the official Flare Faucet and Sepolia Faucets to fund your wallet.
           </TipBox>
 
-          <SubHeading>Quick Links</SubHeading>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-3 p-4 rounded-xl border transition-all group"
-              style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-accent)"; e.currentTarget.style.background = "var(--accent-muted)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-card)"; }}
-            >
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl" style={{ background: "var(--accent-muted)" }}>
-                <Building2 className="w-5 h-5" style={{ color: "var(--accent)" }} />
-              </div>
-              <div>
-                <p className="font-semibold text-sm" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display), system-ui" }}>Employer Dashboard</p>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>Create orgs, run payroll</p>
-              </div>
-              <ChevronRight className="w-4 h-4 ml-auto" style={{ color: "var(--text-muted)" }} />
-            </Link>
-            <Link
-              href="/employee"
-              className="flex items-center gap-3 p-4 rounded-xl border transition-all group"
-              style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-accent)"; e.currentTarget.style.background = "var(--accent-muted)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-card)"; }}
-            >
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl" style={{ background: "var(--accent-muted)" }}>
-                <User className="w-5 h-5" style={{ color: "var(--accent)" }} />
-              </div>
-              <div>
-                <p className="font-semibold text-sm" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display), system-ui" }}>Employee Portal</p>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>View balance, withdraw</p>
-              </div>
-              <ChevronRight className="w-4 h-4 ml-auto" style={{ color: "var(--text-muted)" }} />
-            </Link>
-          </div>
-
-          {/* ─── Divider ─── */}
           <div className="my-12" style={{ borderTop: "1px solid var(--border)" }} />
 
-          {/* ═══ FOR EMPLOYERS ═══ */}
+          {/* FOR EMPLOYERS */}
           <SectionHeading id="for-employers">
             For <span className="gradient-text">Employers</span>
           </SectionHeading>
           <P>
-            DripPay gives employers full control over private payroll operations. From creating an organization to exporting
-            payment history, everything is designed to be simple while keeping salary data confidential.
+            Umbra Pay gives employers full control over private payroll operations. From deploying an organization to tracking hardware-attested budget solvency, everything is designed to be simple while keeping salary data confidential.
           </P>
 
           <SubHeading>Creating an Organization</SubHeading>
           <P>
-            Deploy a new payroll smart contract by clicking <strong style={{ color: "var(--text-primary)" }}>Create Organization</strong> on
-            the employer dashboard. You will choose a name, select the payment currency (ETH or any ERC-20 token), and set
-            a payroll cycle (weekly, bi-weekly, or monthly). A dedicated <code style={{ color: "var(--accent)", background: "rgba(0,229,160,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 13 }}>Organization</code> contract
-            is deployed on Sepolia, and you become its admin.
+            Deploy a new organization smart contract by clicking <strong style={{ color: "var(--text-primary)" }}>Create Organization</strong> on the employer dashboard. This deploys an <code style={{ color: "var(--accent)", background: "rgba(0,229,160,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 13 }}>UmbraOrg</code> contract on Flare Coston2.
           </P>
 
           <SubHeading>Adding Employees</SubHeading>
           <P>
-            Enter each employee{"'"}s wallet address and their salary amount. The salary is encrypted client-side using
-            Zama{"'"}s <code style={{ color: "var(--accent)", background: "rgba(0,229,160,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 13 }}>fhevmjs</code> library
-            before the transaction is submitted. The plaintext salary never touches the blockchain.
+            Enter each employee&apos;s wallet address, role, and salary amount. Salary payloads are stored as encrypted blobs on Coston2 and synced with the TEE Enclave API.
           </P>
-          <TipBox>
-            Salaries are encrypted with FHE before leaving your browser. Even the RPC node and block explorers cannot see the amounts.
-          </TipBox>
 
           <SubHeading>Depositing Funds</SubHeading>
           <P>
-            Fund your organization{"'"}s contract with ETH or ERC-20 tokens. The contract balance must cover the total encrypted
-            payroll before you can execute payments. A real-time USD estimate is shown based on current ETH prices.
+            Fund your payroll vault by depositing native ETH directly to the TEE vault address (<code style={{ color: "var(--accent)", background: "rgba(0,229,160,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 13 }}>0x294dB937C2b9f02A29987472a3F16918a08d1185</code>) on Ethereum Sepolia.
           </P>
 
           <SubHeading>Running Payroll</SubHeading>
           <P>
-            Trigger payroll with a single click. The contract iterates through all employees and performs encrypted addition
-            on each balance:{" "}
-            <code style={{ color: "var(--accent)", background: "rgba(0,229,160,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 13 }}>
-              balance[emp] = FHE.add(balance[emp], salary[emp])
-            </code>.
-            All arithmetic happens on ciphertext — no values are ever revealed during execution.
-          </P>
-
-          <SubHeading>Revealing Salaries</SubHeading>
-          <P>
-            As an admin, you can perform a bulk decrypt of all employee salaries with a single wallet signature. This
-            uses Zama{"'"}s re-encryption mechanism to decrypt values client-side, so you can review the payroll without
-            exposing data on-chain.
-          </P>
-
-          <SubHeading>Updating Salaries</SubHeading>
-          <P>
-            Update any employee{"'"}s salary at any time. The new amount is re-encrypted with FHE and submitted as an
-            encrypted input. The old ciphertext is replaced, and the change takes effect on the next payroll run.
-          </P>
-
-          <SubHeading>Budget Check</SubHeading>
-          <P>
-            Before running payroll, DripPay performs an FHE comparison between the contract balance and the total
-            payroll cost. This check happens entirely on encrypted values — the contract verifies it has sufficient
-            funds without revealing any amounts.
-          </P>
-
-          <SubHeading>Payroll Schedule</SubHeading>
-          <P>
-            Configure your payroll cycle to weekly, bi-weekly, or monthly. The dashboard shows upcoming payroll dates
-            and sends reminders. While payroll execution is still manually triggered, the schedule helps you stay on track.
-          </P>
-
-          <SubHeading>Exporting History</SubHeading>
-          <P>
-            Export your complete payroll history as a PDF report or CSV spreadsheet. Exports include timestamps,
-            employee counts, transaction hashes, and decrypted amounts (if you have previously revealed them).
-          </P>
-
-          <SubHeading>Payroll Receipts</SubHeading>
-          <P>
-            Each payroll event generates a receipt that can be viewed in the dashboard and printed as a PDF. Receipts
-            include the organization name, date, employee count, total amount (encrypted or revealed), and
-            the on-chain transaction hash.
+            Trigger batch payroll on Coston2 with a single click. The TEE enclave verifies payroll claims and updates employee private ledger balances inside hardware isolation.
           </P>
 
           <div className="my-12" style={{ borderTop: "1px solid var(--border)" }} />
 
-          {/* ═══ FOR EMPLOYEES ═══ */}
+          {/* FOR EMPLOYEES */}
           <SectionHeading id="for-employees">
             For <span className="gradient-text">Employees</span>
           </SectionHeading>
           <P>
-            Employees interact with DripPay through a simple portal. Connect your wallet, view your encrypted balance,
-            and withdraw real funds — all while keeping your salary completely private.
+            Employees access their funds via the employee portal on Ethereum Sepolia and Flare Coston2.
           </P>
 
-          <SubHeading>Connecting Your Wallet</SubHeading>
+          <SubHeading>Connecting & Auto-Discovery</SubHeading>
           <P>
-            When you connect your wallet, DripPay automatically discovers all organizations that have added your address
-            as an employee. No setup required — just connect and go.
+            When you connect your wallet, Umbra Pay queries the Factory contract to automatically find every organization you belong to.
           </P>
-
-          <SubHeading>Viewing Your Balance</SubHeading>
-          <P>
-            Your accumulated payroll balance is stored as an encrypted value on-chain. To view it, you sign a message
-            with your wallet that authorizes client-side decryption. The decrypted balance is displayed only in your
-            browser and is never sent anywhere.
-          </P>
-          <TipBox>
-            Decryption happens entirely in your browser using your wallet signature. No server or third party ever sees your balance.
-          </TipBox>
 
           <SubHeading>Withdrawing Funds</SubHeading>
           <P>
-            Withdraw your accumulated balance as real ETH or ERC-20 tokens at any time. The contract decrements your
-            encrypted balance and transfers the corresponding amount to your wallet. You can withdraw partial or full amounts.
-          </P>
-
-          <SubHeading>Transaction History</SubHeading>
-          <P>
-            View a complete history of all payroll credits and withdrawals associated with your address. Each entry
-            shows the date, type (credit or withdrawal), amount (decryptable with your signature), and the transaction hash.
-          </P>
-
-          <SubHeading>Payslips</SubHeading>
-          <P>
-            Download encrypted payslips for each payroll cycle. Each payslip contains the organization name, pay period,
-            and your encrypted salary amount. You can decrypt the salary directly on the payslip using your wallet
-            signature, then save or print the document.
-          </P>
-
-          <SubHeading>Joining an Organization</SubHeading>
-          <P>
-            In most cases, organizations are automatically discovered when you connect your wallet. If an organization
-            is not detected, you can manually join by entering its contract address. This is useful for newly deployed
-            contracts that have not yet been indexed.
+            Request a withdrawal through the portal. The TEE enclave validates your private balance and issues a signed native ETH settlement transaction directly to your wallet on Sepolia.
           </P>
 
           <div className="my-12" style={{ borderTop: "1px solid var(--border)" }} />
 
-          {/* ═══ SMART CONTRACTS ═══ */}
+          {/* SMART CONTRACTS */}
           <SectionHeading id="smart-contracts">
             <span className="gradient-text">Smart Contracts</span>
           </SectionHeading>
-          <P>
-            DripPay{"'"}s on-chain layer consists of two core contracts deployed on Ethereum Sepolia, powered by Zama{"'"}s
-            fhEVM coprocessor for encrypted computation.
-          </P>
 
-          <SubHeading>OrganizationFactory</SubHeading>
-          <P>
-            The factory contract is the entry point for creating new organizations. It deploys individual{" "}
-            <code style={{ color: "var(--accent)", background: "rgba(0,229,160,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 13 }}>Organization</code> contract
-            instances and maintains an index of all deployed organizations and their employees, enabling the auto-discovery feature.
-          </P>
-
-          <SubHeading>Organization</SubHeading>
-          <P>
-            Each organization is a standalone smart contract that manages its own employee list, encrypted salaries,
-            encrypted balances, and payroll execution. All FHE operations (encrypted addition, comparison, and permission grants)
-            happen within this contract.
-          </P>
-
-          <SubHeading>Key Functions</SubHeading>
+          <SubHeading>Deployed Contract Addresses</SubHeading>
           <FunctionTable
             rows={[
-              { fn: "createOrg(name)", desc: "Deploy a new Organization contract via the factory" },
-              { fn: "addEmployee(addr, encSalary)", desc: "Register an employee with an FHE-encrypted salary" },
-              { fn: "removeEmployee(addr)", desc: "Remove an employee from the organization" },
-              { fn: "updateSalary(addr, encSalary)", desc: "Update an employee's encrypted salary" },
-              { fn: "deposit()", desc: "Fund the contract with ETH (payable)" },
-              { fn: "runPayroll()", desc: "Execute batch payroll on all encrypted balances" },
-              { fn: "withdraw(amount)", desc: "Employee withdraws accumulated funds" },
-              { fn: "balanceOf(addr)", desc: "Returns the encrypted balance handle for an employee" },
-              { fn: "budgetCheck()", desc: "FHE comparison: contract balance >= total payroll" },
-              { fn: "revealSalary(addr)", desc: "Admin re-encrypts an employee's salary for viewing" },
+              { fn: "UmbraOrgFactory (Coston2)", desc: "0x8C00cab72b52644c0F98570c5DC094E3E214B241" },
+              { fn: "Demo UmbraOrg (Coston2)", desc: "0x89E6fBd9B415D6E16b2cbeD92D4924659B8e9D94" },
+              { fn: "TEE Vault Address (Sepolia)", desc: "0x294dB937C2b9f02A29987472a3F16918a08d1185" },
             ]}
           />
 
-          <SubHeading>Contract Addresses (Sepolia)</SubHeading>
-          <P>
-            The contracts are deployed on Ethereum Sepolia with the Zama fhEVM coprocessor. Key infrastructure addresses:
-          </P>
-          <div className="my-4 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "#0c0c10" }}>
-            <div className="space-y-2 text-sm" style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                <span style={{ color: "var(--text-muted)", minWidth: 100 }}>Zama ACL:</span>
-                <span style={{ color: "var(--accent)", fontSize: 13 }}>0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D</span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                <span style={{ color: "var(--text-muted)", minWidth: 100 }}>Zama KMS:</span>
-                <span style={{ color: "var(--accent)", fontSize: 13 }}>0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A</span>
-              </div>
-            </div>
-          </div>
-
-          <TipBox variant="warning">
-            DripPay is a hackathon project and has not been audited. Do not use it with real funds on mainnet.
-          </TipBox>
-
           <div className="my-12" style={{ borderTop: "1px solid var(--border)" }} />
 
-          {/* ═══ FHE ENCRYPTION ═══ */}
-          <SectionHeading id="fhe-encryption">
-            <span className="gradient-text">FHE Encryption</span>
+          {/* TEE PRIVACY & FCC */}
+          <SectionHeading id="tee-privacy">
+            <span className="gradient-text">TEE Privacy & FCC</span>
           </SectionHeading>
 
-          <SubHeading>What is Fully Homomorphic Encryption?</SubHeading>
+          <SubHeading>Why Trusted Execution Environments?</SubHeading>
           <P>
-            Fully Homomorphic Encryption (FHE) is a cryptographic technique that allows computation on encrypted data
-            without decrypting it first. The results, when decrypted, are identical to performing the same operations
-            on the plaintext. Think of it as doing math inside a locked box — you get the right answer without ever
-            opening the box.
-          </P>
-
-          <SubHeading>How DripPay Uses FHE</SubHeading>
-          <P>
-            DripPay leverages Zama{"'"}s fhEVM, a coprocessor on Ethereum Sepolia that extends the EVM with FHE capabilities.
-            The flow works in three stages:
-          </P>
-          <BulletList
-            items={[
-              <span key="1"><strong style={{ color: "var(--text-primary)" }}>Encrypt inputs:</strong> Salary amounts are encrypted client-side using fhevmjs before being sent to the contract.</span>,
-              <span key="2"><strong style={{ color: "var(--text-primary)" }}>Compute on ciphertext:</strong> The smart contract performs arithmetic (add, compare) on encrypted values using Zama{"'"}s TFHE library.</span>,
-              <span key="3"><strong style={{ color: "var(--text-primary)" }}>Decrypt outputs:</strong> Only authorized users (the employee or admin) can request re-encryption and decrypt values client-side.</span>,
-            ]}
-          />
-
-          <SubHeading>Client-Side Encryption</SubHeading>
-          <P>
-            When an employer sets a salary, the plaintext amount never leaves the browser. The fhevmjs library encrypts it
-            into an FHE-compatible ciphertext that can be processed by the Zama coprocessor:
-          </P>
-          <CodeBlock
-            language="typescript"
-            code={`import { createInstance } from "fhevmjs";
-
-// Initialize the fhEVM instance
-const instance = await createInstance({
-  networkUrl: "https://devnet.zama.ai",
-  gatewayUrl: "https://gateway.zama.ai",
-});
-
-// Encrypt a salary amount (e.g., 5000)
-const input = instance.createEncryptedInput(
-  contractAddress,
-  userAddress
-);
-input.add64(salaryAmount);
-const encrypted = input.encrypt();
-
-// Send encrypted input to the smart contract
-await contract.addEmployee(employeeAddress, encrypted);`}
-          />
-
-          <SubHeading>On-Chain Encrypted Math</SubHeading>
-          <P>
-            Inside the smart contract, all salary and balance operations use Zama{"'"}s TFHE library. The EVM never
-            sees plaintext values:
-          </P>
-          <CodeBlock
-            language="solidity"
-            code={`import "fhevm/lib/TFHE.sol";
-
-// Encrypted state variables
-mapping(address => euint64) private balances;
-mapping(address => euint64) private salaries;
-
-// Run payroll: add encrypted salary to encrypted balance
-function runPayroll(address[] memory employees) external {
-    for (uint i = 0; i < employees.length; i++) {
-        balances[employees[i]] = TFHE.add(
-            balances[employees[i]],
-            salaries[employees[i]]
-        );
-        TFHE.allow(balances[employees[i]], employees[i]);
-    }
-    emit PayrollExecuted(block.timestamp, employees.length);
-}`}
-          />
-
-          <SubHeading>Client-Side Decryption</SubHeading>
-          <P>
-            When an employee wants to view their balance, they sign an EIP-712 message that authorizes the Zama
-            gateway to re-encrypt the value with a key only they hold:
-          </P>
-          <CodeBlock
-            language="typescript"
-            code={`// Get the encrypted balance handle from the contract
-const balanceHandle = await contract.balanceOf(userAddress);
-
-// Generate a keypair for re-encryption
-const { publicKey, privateKey } = instance.generateKeypair();
-
-// Create and sign the EIP-712 authorization
-const eip712 = instance.createEIP712(publicKey, contractAddress);
-const signature = await signer.signTypedData(eip712);
-
-// Decrypt the balance (happens entirely client-side)
-const decryptedBalance = await instance.reencrypt(
-  balanceHandle,
-  privateKey,
-  publicKey,
-  signature,
-  contractAddress,
-  userAddress
-);
-
-console.log("Your balance:", decryptedBalance);`}
-          />
-
-          <SubHeading>Why FHE Over Other Privacy Tech?</SubHeading>
-          <P>
-            There are several approaches to blockchain privacy — here is why DripPay chose FHE:
-          </P>
-          <div className="overflow-x-auto my-4 rounded-xl border" style={{ borderColor: "var(--border)" }}>
-            <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid var(--border)" }}>
-                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display), system-ui" }}>Approach</th>
-                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display), system-ui" }}>Compute on Encrypted Data?</th>
-                  <th className="text-left px-4 py-3 font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display), system-ui" }}>On-chain State?</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td className="px-4 py-3 font-medium" style={{ color: "var(--accent)" }}>FHE (Zama)</td>
-                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>Yes - full arithmetic</td>
-                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>Yes - encrypted</td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td className="px-4 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>ZK Proofs</td>
-                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>No - only verification</td>
-                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>Yes - committed</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>MPC</td>
-                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>Yes - distributed</td>
-                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>No - off-chain</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <P>
-            FHE is uniquely suited for payroll because it allows the smart contract to <em>add encrypted salaries to
-            encrypted balances</em> and <em>compare encrypted totals</em> — operations that ZK proofs and MPC
-            cannot perform directly on-chain.
+            TEEs provide hardware-enforced memory isolation and cryptographic attestation. Unlike legacy FHE or complex multiparty computation, TEEs allow instant computation and direct native key management without computational overhead or expensive gas fees.
           </P>
 
           <div className="my-12" style={{ borderTop: "1px solid var(--border)" }} />
 
-          {/* ═══ FEATURES ═══ */}
+          {/* FEATURES */}
           <SectionHeading id="features">
             <span className="gradient-text">Features</span>
           </SectionHeading>
-          <P>
-            A comprehensive list of everything DripPay offers.
-          </P>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-6">
             <FeatureCard
               icon={<Shield className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Encrypted Salaries"
-              desc="All salary amounts are FHE-encrypted before reaching the blockchain. No one can see what anyone earns."
+              title="TEE Hardware Privacy"
+              desc="Salaries and payout ledger balances remain isolated inside hardware enclaves."
             />
             <FeatureCard
               icon={<Layers className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Batch Payroll"
-              desc="Execute payroll for all employees in a single transaction. Encrypted addition across all balances."
+              title="Two-Chain Settlement"
+              desc="Coston2 for instant coordination, Sepolia for native ETH deposits and settlements."
             />
             <FeatureCard
               icon={<Search className="w-4 h-4" style={{ color: "var(--accent)" }} />}
               title="Employee Auto-Discovery"
-              desc="Employees are automatically found when they connect their wallet. No manual configuration needed."
+              desc="Automatic registration and organization lookup upon wallet connection."
             />
             <FeatureCard
               icon={<CreditCard className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Salary Updates"
-              desc="Re-encrypt and update any employee's salary at any time. Changes take effect next payroll cycle."
-            />
-            <FeatureCard
-              icon={<Calculator className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Budget Check"
-              desc="FHE comparison verifies the contract has sufficient funds without revealing any amounts."
-            />
-            <FeatureCard
-              icon={<Eye className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Reveal All Salaries"
-              desc="Admins can bulk-decrypt all salaries with a single wallet signature for review."
-            />
-            <FeatureCard
-              icon={<FileText className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Encrypted Payslips"
-              desc="Employees download payslips with encrypted salary data and decrypt them client-side."
-            />
-            <FeatureCard
-              icon={<FileDown className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Export History"
-              desc="Export complete payroll history as PDF reports or CSV spreadsheets."
-            />
-            <FeatureCard
-              icon={<Globe className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Multi-Currency USD Estimates"
-              desc="Real-time USD value estimates for ETH balances and transaction costs."
-            />
-            <FeatureCard
-              icon={<CalendarDays className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Payroll Scheduling"
-              desc="Set weekly, bi-weekly, or monthly payroll cycles with upcoming date tracking."
-            />
-            <FeatureCard
-              icon={<Zap className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Interactive Demo"
-              desc="Try DripPay with mock data before deploying real contracts. Full end-to-end flow simulation."
-            />
-            <FeatureCard
-              icon={<PartyPopper className="w-4 h-4" style={{ color: "var(--accent)" }} />}
-              title="Confetti on Payroll"
-              desc="Because running payroll should feel good. Celebratory confetti animation on successful execution."
+              title="Instant Withdrawal"
+              desc="Enclave-signed direct native ETH transfers to employee wallets on Sepolia."
             />
           </div>
 
-          <div className="my-12" style={{ borderTop: "1px solid var(--border)" }} />
-
-          {/* ═══ USE CASES ═══ */}
-          <SectionHeading id="use-cases">
-            Real-World <span className="gradient-text">Use Cases</span>
-          </SectionHeading>
-          <P>
-            DripPay isn&apos;t just a hackathon demo - it solves real problems for real people across the globe. Here&apos;s who benefits most from confidential on-chain payroll.
-          </P>
-
-          <SubHeading>Emerging Markets with Capital Controls</SubHeading>
-          <P>
-            In countries like <strong>Argentina</strong> and <strong>Nigeria</strong>, strict capital controls make it difficult to receive international payments. Companies already pay contractors in crypto to bypass these limitations. But on a public blockchain, every payment is visible - exposing salary data to governments, competitors, and the public. DripPay encrypts these payments so companies can pay globally while keeping compensation private.
-          </P>
-          <TipBox variant="tip">
-            Argentina has one of the highest crypto adoption rates in the world. Inflation above 200% drives demand for USD-denominated crypto payments. DripPay enables companies to pay Argentine contractors in ETH or stablecoins with full salary privacy.
-          </TipBox>
-
-          <SubHeading>Cross-Border Remote Teams</SubHeading>
-          <P>
-            Distributed teams across different countries face a dilemma: pay on-chain for speed and transparency, but expose everyone&apos;s salary to each other. A senior engineer in the US earning $15k/mo and a junior developer in Southeast Asia earning $2k/mo shouldn&apos;t have to know each other&apos;s compensation. DripPay lets companies pay everyone on the same chain with the same contract - while keeping individual amounts confidential.
-          </P>
-
-          <SubHeading>DAO Contributor Payments</SubHeading>
-          <P>
-            DAOs often pay contributors through public on-chain proposals. This means every community member can see what every contributor earns - leading to compensation disputes, politics, and talent loss. DripPay lets DAOs run payroll where the total budget is verifiable but individual payments are encrypted. The treasury multisig executes payroll, and only each contributor can see their own allocation.
-          </P>
-
-          <SubHeading>Freelancer and Contractor Payments</SubHeading>
-          <P>
-            Freelancers working with multiple clients don&apos;t want Client A to see what Client B pays them. On public blockchains, any client can look up the freelancer&apos;s wallet and see all incoming payments. DripPay ensures that each payment from each organization is encrypted independently - only the freelancer and that specific employer can see the amount.
-          </P>
-
-          <SubHeading>Compliance-Sensitive Industries</SubHeading>
-          <P>
-            Industries like finance, legal, and healthcare have strict rules about compensation privacy. Public blockchain payroll is a non-starter in these sectors. DripPay bridges this gap - salaries are on-chain (auditable, trustless, automated) but encrypted (private, compliant). This opens up on-chain payroll for industries that previously couldn&apos;t consider it.
-          </P>
-
-          <TipBox variant="info">
-            Our roadmap includes <strong>Verifiable Income Proofs</strong> - employees will be able to generate ZK attestations proving their salary falls within a range (e.g., &quot;I earn above $X/month&quot;) without revealing the exact amount. This bridges FHE privacy with real-world needs like mortgage applications, visa proofs, and credit checks.
-          </TipBox>
-
-          <div className="my-12" style={{ borderTop: "1px solid var(--border)" }} />
-
-          {/* ═══ FAQ ═══ */}
+          {/* FAQ */}
           <SectionHeading id="faq">
             Frequently Asked <span className="gradient-text">Questions</span>
           </SectionHeading>
@@ -1039,91 +589,21 @@ console.log("Your balance:", decryptedBalance);`}
           <div className="my-6">
             <FAQItem
               question="Is my salary really private?"
-              answer={
-                <span>
-                  Yes. Your salary is encrypted using Fully Homomorphic Encryption before it is submitted to the blockchain.
-                  The encrypted value is stored on-chain, and only you (and the organization admin) can decrypt it using a
-                  wallet signature. Block explorers, other employees, and even the RPC nodes cannot see the plaintext amount.
-                </span>
-              }
+              answer="Yes. Salary amounts are encrypted and stored inside hardware-isolated TEE enclaves. Neither block explorers nor unauthorized third parties can access the plaintext amounts."
             />
             <FAQItem
-              question="Can my employer see my salary?"
-              answer={
-                <span>
-                  Yes. The employer (organization admin) has <code style={{ color: "var(--accent)", background: "rgba(0,229,160,0.08)", padding: "2px 5px", borderRadius: 4, fontSize: 13 }}>TFHE.allow</code> permission
-                  on your salary ciphertext, which means they can request a re-encryption and decrypt it client-side. This is
-                  by design — the employer needs to know what they are paying you. However, they cannot see other employees{"'"} salary
-                  amounts unless they explicitly reveal them.
-                </span>
-              }
-            />
-            <FAQItem
-              question="Can other employees see my salary?"
-              answer={
-                <span>
-                  No. Each encrypted salary is permissioned so that only the individual employee and the admin can decrypt it.
-                  Other employees have no access to your salary ciphertext{"'"}s decryption keys.
-                </span>
-              }
-            />
-            <FAQItem
-              question="What blockchain is this on?"
-              answer={
-                <span>
-                  DripPay runs on <strong style={{ color: "var(--text-primary)" }}>Ethereum Sepolia</strong> with the{" "}
-                  <strong style={{ color: "var(--text-primary)" }}>Zama fhEVM coprocessor</strong>. Zama is not a separate chain —
-                  it is a coprocessor that adds FHE capabilities to the existing Ethereum EVM. Your contracts deploy on
-                  Sepolia and interact with Zama{"'"}s infrastructure for encrypted operations.
-                </span>
-              }
-            />
-            <FAQItem
-              question="Is this audited?"
-              answer={
-                <span>
-                  No. DripPay is a hackathon project built for the PL Genesis: Frontiers of Collaboration Hackathon. It has
-                  not been professionally audited and should not be used with real funds on mainnet. Use it on Sepolia testnet only.
-                </span>
-              }
-            />
-            <FAQItem
-              question="What tokens are supported?"
-              answer={
-                <span>
-                  DripPay supports <strong style={{ color: "var(--text-primary)" }}>ETH</strong> (native Sepolia Ether) and{" "}
-                  <strong style={{ color: "var(--text-primary)" }}>any ERC-20 token</strong>. When creating an organization, you
-                  choose the payment currency. The contract handles both native ETH transfers and ERC-20 token transfers.
-                </span>
-              }
-            />
-            <FAQItem
-              question="How do I get Sepolia ETH?"
-              answer={
-                <span>
-                  You can get free Sepolia ETH from several faucets:
-                  <br /><br />
-                  <a href="https://cloud.google.com/application/web3/faucet/ethereum/sepolia" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }} className="underline">Google Cloud Sepolia Faucet</a>
-                  <br />
-                  <a href="https://www.alchemy.com/faucets/ethereum-sepolia" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }} className="underline">Alchemy Sepolia Faucet</a>
-                  <br />
-                  <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }} className="underline">sepoliafaucet.com</a>
-                </span>
-              }
+              question="Which networks does Umbra Pay use?"
+              answer="Flare Coston2 (Chain ID 114) is used for coordination (contracts and org management), and Ethereum Sepolia (Chain ID 11155111) is used for native ETH deposits and withdrawals."
             />
           </div>
 
-          {/* ─── Footer ─── */}
           <div className="mt-16 pt-8" style={{ borderTop: "1px solid var(--border)" }}>
             <div className="accent-card p-6 sm:p-8 text-center">
-              <h3
-                className="text-xl sm:text-2xl font-bold mb-2"
-                style={{ fontFamily: "var(--font-display), system-ui" }}
-              >
+              <h3 className="text-xl sm:text-2xl font-bold mb-2" style={{ fontFamily: "var(--font-display), system-ui" }}>
                 Ready to get <span className="gradient-text">started</span>?
               </h3>
               <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
-                Launch DripPay and experience private on-chain payroll.
+                Launch Umbra Pay and experience confidential on-chain payroll.
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 <Link href="/dashboard" className="btn-primary">
@@ -1135,11 +615,6 @@ console.log("Your balance:", decryptedBalance);`}
                   Employee Portal
                 </Link>
               </div>
-            </div>
-            <div className="text-center mt-8">
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Built with FHE by DripPay for PL Genesis: Frontiers of Collaboration Hackathon
-              </p>
             </div>
           </div>
         </div>

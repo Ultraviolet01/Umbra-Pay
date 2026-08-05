@@ -3,21 +3,21 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Wallet, Loader2, Check, ExternalLink, Lock } from "lucide-react";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
+import { UMBRA_ORG_ABI } from "@/lib/contracts";
 
 interface WithdrawCardProps {
   orgAddress: `0x${string}`;
   tokenSymbol: string;
   tokenDecimals: number;
-  maxBalance: string | null; // human-readable decrypted balance, e.g. "0.003000" — null means not yet decrypted
+  maxBalance: string | null;
   onWithdrawSuccess?: () => void;
 }
 
 const WITHDRAW_STEPS = [
-  "Confirm transaction in wallet...",
-  "Waiting for on-chain confirmation...",
+  "Confirm withdrawal request on Coston2...",
+  "Waiting for TEE Enclave settlement on Sepolia...",
 ];
 
 export function WithdrawCard({
@@ -27,6 +27,7 @@ export function WithdrawCard({
   maxBalance,
   onWithdrawSuccess,
 }: WithdrawCardProps) {
+  const { address: connectedAddress } = useAccount();
   const [amount, setAmount] = useState("");
   const [withdrawStep, setWithdrawStep] = useState(0);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -35,7 +36,7 @@ export function WithdrawCard({
 
   const { writeContract, data: txHash, isPending, error: writeError, reset } = useWriteContract();
 
-  const { isSuccess: isTxConfirmed, data: receipt } = useWaitForTransactionReceipt({
+  const { isSuccess: isTxConfirmed } = useWaitForTransactionReceipt({
     hash: txHash,
     query: { enabled: !!txHash },
   });
@@ -46,23 +47,32 @@ export function WithdrawCard({
   const exceedsBalance = hasDecrypted && numAmount > maxNum;
   const isValid = numAmount > 0 && hasDecrypted && !exceedsBalance;
 
-  // Track tx confirmation
   useEffect(() => {
     if (isTxConfirmed && withdrawStep === 1) {
-      setWithdrawnAmount(amount);
-      setIsSuccess(true);
-      onWithdrawSuccess?.();
+      // Notify TEE Enclave to execute settlement on Sepolia
+      fetch("/api/enclave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "withdraw",
+          employeeAddress: connectedAddress,
+          amountEth: amount,
+        }),
+      }).then(() => {
+        setWithdrawnAmount(amount);
+        setIsSuccess(true);
+        onWithdrawSuccess?.();
 
-      setTimeout(() => {
-        setIsSuccess(false);
-        setAmount("");
-        setWithdrawStep(0);
-        reset();
-      }, 3000);
+        setTimeout(() => {
+          setIsSuccess(false);
+          setAmount("");
+          setWithdrawStep(0);
+          reset();
+        }, 3000);
+      });
     }
-  }, [isTxConfirmed]);
+  }, [isTxConfirmed, withdrawStep, amount, connectedAddress, onWithdrawSuccess, reset]);
 
-  // Track write errors
   useEffect(() => {
     if (writeError) {
       setErrorMsg((writeError as any)?.shortMessage || writeError.message || "Transaction failed");
@@ -71,7 +81,7 @@ export function WithdrawCard({
   }, [writeError]);
 
   const handleWithdraw = () => {
-    if (!isValid) return;
+    if (!isValid || !connectedAddress) return;
     setErrorMsg("");
 
     try {
@@ -80,9 +90,9 @@ export function WithdrawCard({
 
       writeContract({
         address: orgAddress,
-        abi: ORGANIZATION_ABI,
-        functionName: "withdraw",
-        args: [amountInWei],
+        abi: UMBRA_ORG_ABI,
+        functionName: "requestWithdrawal",
+        args: [amountInWei, connectedAddress],
       });
 
       setWithdrawStep(1);
@@ -110,14 +120,11 @@ export function WithdrawCard({
             )}
           </div>
           <div>
-            <h3
-              className="font-bold"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+            <h3 className="font-bold" style={{ fontFamily: "var(--font-display)" }}>
               Withdraw
             </h3>
             <p className="text-xs text-[var(--text-muted)]">
-              Transfer to your wallet
+              Request payout via Flare TEE enclave
             </p>
           </div>
         </div>
@@ -139,21 +146,12 @@ export function WithdrawCard({
               >
                 <Check className="h-6 w-6 text-[var(--accent)]" />
               </motion.div>
-              <p
-                className="font-bold gradient-text text-lg mb-1"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
+              <p className="font-bold gradient-text text-lg mb-1" style={{ fontFamily: "var(--font-display)" }}>
                 {withdrawnAmount} {tokenSymbol}
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
-                Withdrawn successfully
+                Settled on Sepolia by TEE Enclave
               </p>
-              {txHash && (
-                <div className="mt-2 flex items-center justify-center gap-1 text-[10px] text-[var(--text-muted)]">
-                  <span className="font-mono">{txHash.slice(0, 8)}...{txHash.slice(-6)}</span>
-                  <ExternalLink className="h-2.5 w-2.5" />
-                </div>
-              )}
             </motion.div>
           ) : (
             <motion.div
@@ -166,7 +164,7 @@ export function WithdrawCard({
                 {!hasDecrypted ? (
                   <div className="rounded-lg bg-[rgba(255,200,50,0.06)] border border-[rgba(255,200,50,0.15)] px-4 py-3">
                     <p className="text-xs text-[var(--text-secondary)]">
-                      Decrypt your balance first to enable withdrawals.
+                      Attest your balance first to enable withdrawals.
                     </p>
                   </div>
                 ) : (
@@ -201,21 +199,19 @@ export function WithdrawCard({
                     </div>
                     {exceedsBalance && (
                       <p className="mt-1.5 text-[11px] text-red-400">
-                        Amount exceeds your decrypted balance
+                        Amount exceeds your attested balance
                       </p>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Error message */}
               {errorMsg && (
                 <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
                   <p className="text-xs text-red-400">{errorMsg}</p>
                 </div>
               )}
 
-              {/* Withdraw progress */}
               <AnimatePresence>
                 {isWithdrawing && (
                   <motion.div
@@ -226,13 +222,7 @@ export function WithdrawCard({
                   >
                     <div className="rounded-lg bg-[rgba(0,229,160,0.04)] border border-[var(--border-accent)] p-3 space-y-2.5">
                       {WITHDRAW_STEPS.map((step, i) => (
-                        <motion.div
-                          key={step}
-                          initial={{ opacity: 0, x: -6 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.15 }}
-                          className="flex items-center gap-2"
-                        >
+                        <div key={step} className="flex items-center gap-2">
                           {withdrawStep > i ? (
                             <Check className="h-3 w-3 text-[var(--accent)]" />
                           ) : withdrawStep === i ? (
@@ -240,16 +230,10 @@ export function WithdrawCard({
                           ) : (
                             <div className="h-3 w-3 rounded-full border border-[var(--border)]" />
                           )}
-                          <span
-                            className={`text-[11px] ${
-                              withdrawStep >= i
-                                ? "text-[var(--text-secondary)]"
-                                : "text-[var(--text-muted)]"
-                            }`}
-                          >
+                          <span className={`text-[11px] ${withdrawStep >= i ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>
                             {step}
                           </span>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   </motion.div>
@@ -269,7 +253,7 @@ export function WithdrawCard({
                 ) : (
                   <>
                     <Wallet className="h-4 w-4" />
-                    Withdraw Funds
+                    Request TEE Withdrawal
                   </>
                 )}
               </button>

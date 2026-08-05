@@ -1,22 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Clock, Check, ExternalLink, ArrowDownLeft, Loader2, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Clock, Check, ExternalLink, Loader2, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { formatUnits } from "viem";
-import { AnimatePresence } from "framer-motion";
 import { useContractEvents } from "@/hooks/useContractEvents";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
+import { UMBRA_ORG_ABI } from "@/lib/contracts";
 import { PayslipModal } from "@/components/shared/PayslipModal";
 import { ExportHistory } from "@/components/shared/ExportHistory";
 
-const ETHERSCAN_URL = "https://sepolia.etherscan.io/tx";
+const COSTON2_EXPLORER_URL = "https://coston2-explorer.flare.network/tx";
+const SEPOLIA_EXPLORER_URL = "https://sepolia.etherscan.io/tx";
 
 interface PayrollHistoryProps {
   orgAddress?: `0x${string}`;
   orgName?: string;
   tokenSymbol?: string;
   tokenDecimals?: number;
+}
+
+interface LocalDeposit {
+  txHash: string;
+  amountEth: string;
+  timestamp: number;
 }
 
 export function PayrollHistory({
@@ -30,45 +36,100 @@ export function PayrollHistory({
     blockNumber: bigint;
     employeeCount: number;
   } | null>(null);
+
+  const [localDeposits, setLocalDeposits] = useState<LocalDeposit[]>([]);
+
   const { events: payrollEvents, isLoading: loadingPayroll } = useContractEvents({
     address: orgAddress,
-    abi: ORGANIZATION_ABI as any,
+    abi: UMBRA_ORG_ABI as any,
     eventName: "PayrollExecuted",
     enabled: !!orgAddress,
   });
 
   const { events: depositEvents, isLoading: loadingDeposits } = useContractEvents({
     address: orgAddress,
-    abi: ORGANIZATION_ABI as any,
+    abi: UMBRA_ORG_ABI as any,
     eventName: "Deposit",
     enabled: !!orgAddress,
   });
 
-  // Merge and sort by block number (newest first)
+  const loadLocalDeposits = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const allDeposits: LocalDeposit[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.toLowerCase().startsWith("drippay_deposits_")) {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              allDeposits.push(...list);
+            }
+          }
+        }
+      }
+      const uniqueMap = new Map<string, LocalDeposit>();
+      for (const d of allDeposits) {
+        if (d.txHash && !uniqueMap.has(d.txHash.toLowerCase())) {
+          uniqueMap.set(d.txHash.toLowerCase(), d);
+        }
+      }
+      setLocalDeposits(Array.from(uniqueMap.values()));
+    } catch (e) {
+      console.error("Failed to load local deposits", e);
+    }
+  };
+
+  useEffect(() => {
+    loadLocalDeposits();
+    window.addEventListener("drippay_deposit_added", loadLocalDeposits);
+    return () => window.removeEventListener("drippay_deposit_added", loadLocalDeposits);
+  }, [orgAddress]);
+
+  // Merge contract events & local deposits, sorted newest first
   const allEvents = [
-    ...payrollEvents.map((e) => ({ ...e, _type: "payroll" as const })),
-    ...depositEvents.map((e) => ({ ...e, _type: "deposit" as const })),
-  ].sort((a, b) =>
-    Number((b.blockNumber ?? BigInt(0)) - (a.blockNumber ?? BigInt(0)))
-  );
+    ...payrollEvents.map((e) => ({
+      _type: "payroll" as const,
+      blockNumber: e.blockNumber ?? BigInt(0),
+      txHash: (e.transactionHash as string) || "",
+      label: "Payroll Executed",
+      details: `${(e.args as any)?.employeeCount?.toString() ?? "?"} employees`,
+      explorerUrl: `${COSTON2_EXPLORER_URL}/${e.transactionHash}`,
+      isPayroll: true,
+      rawEvent: e,
+    })),
+    ...depositEvents.map((e) => ({
+      _type: "deposit" as const,
+      blockNumber: e.blockNumber ?? BigInt(0),
+      txHash: (e.transactionHash as string) || "",
+      label: "Deposit (Coston2)",
+      details: `${formatUnits((e.args as any)?.amount ?? BigInt(0), tokenDecimals)} ${tokenSymbol}`,
+      explorerUrl: `${COSTON2_EXPLORER_URL}/${e.transactionHash}`,
+      isPayroll: false,
+    })),
+    ...localDeposits.map((d, i) => ({
+      _type: "local_deposit" as const,
+      blockNumber: BigInt(99999999 - i),
+      txHash: d.txHash,
+      label: "Deposit (TEE Vault)",
+      details: `${d.amountEth} ${tokenSymbol}`,
+      explorerUrl: `${SEPOLIA_EXPLORER_URL}/${d.txHash}`,
+      isPayroll: false,
+    })),
+  ].sort((a, b) => Number(b.blockNumber - a.blockNumber));
 
   const isLoading = loadingPayroll || loadingDeposits;
   const [expanded, setExpanded] = useState(false);
 
-  const exportEvents = allEvents.map((evt) => {
-    const isPayroll = evt._type === "payroll";
-    const args = evt.args as Record<string, any>;
-    const txHash = (evt.transactionHash as string) || "";
-    return {
-      type: isPayroll ? "Payroll Executed" : "Deposit",
-      details: isPayroll
-        ? `${args.employeeCount?.toString() ?? "?"} employees`
-        : `${formatUnits(args.amount ?? BigInt(0), tokenDecimals)} ${tokenSymbol}`,
-      txHash,
-      blockNumber: (evt.blockNumber ?? BigInt(0)).toString(),
-      etherscanLink: txHash ? `${ETHERSCAN_URL}/${txHash}` : "",
-    };
-  });
+  const exportEvents = allEvents.map((evt) => ({
+    type: evt.label,
+    details: evt.details,
+    txHash: evt.txHash,
+    blockNumber: evt.blockNumber.toString(),
+    etherscanLink: evt.explorerUrl,
+  }));
+
   const COLLAPSED_COUNT = 5;
   const visibleEvents = expanded ? allEvents : allEvents.slice(0, COLLAPSED_COUNT);
   const hasMore = allEvents.length > COLLAPSED_COUNT;
@@ -104,7 +165,7 @@ export function PayrollHistory({
         {isLoading ? (
           <div className="py-6 text-center">
             <Loader2 className="h-5 w-5 animate-spin text-[var(--accent)] mx-auto mb-2" />
-            <p className="text-xs text-[var(--text-muted)]">Loading events...</p>
+            <p className="text-xs text-[var(--text-muted)]">Loading activity...</p>
           </div>
         ) : allEvents.length === 0 ? (
           <div className="py-6 text-center">
@@ -113,16 +174,13 @@ export function PayrollHistory({
         ) : (
           <>
             {visibleEvents.map((evt, i) => {
-              const isPayroll = evt._type === "payroll";
-              const args = evt.args as Record<string, any>;
-              const txHash = evt.transactionHash;
-              const shortHash = txHash
-                ? `${txHash.slice(0, 6)}...${txHash.slice(-4)}`
+              const shortHash = evt.txHash
+                ? `${evt.txHash.slice(0, 6)}...${evt.txHash.slice(-4)}`
                 : "";
 
               return (
                 <motion.div
-                  key={`${txHash}-${i}`}
+                  key={`${evt.txHash}-${i}`}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
@@ -132,7 +190,7 @@ export function PayrollHistory({
                     <div className="relative flex flex-col items-center shrink-0">
                       <div
                         className={`h-2 w-2 rounded-full ${
-                          isPayroll ? "bg-[var(--accent)]" : "bg-blue-400"
+                          evt.isPayroll ? "bg-[var(--accent)]" : "bg-blue-400"
                         } opacity-60`}
                       />
                       {i < visibleEvents.length - 1 && (
@@ -141,17 +199,15 @@ export function PayrollHistory({
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs sm:text-sm font-medium">
-                        {isPayroll ? "Payroll Executed" : "Deposit"}
+                        {evt.label}
                       </p>
                       <p className="text-[11px] sm:text-xs text-[var(--text-muted)] truncate">
-                        {isPayroll
-                          ? `${args.employeeCount?.toString() ?? "?"} employees`
-                          : `${formatUnits(args.amount ?? BigInt(0), tokenDecimals)} ${tokenSymbol}`}
-                        {txHash && (
+                        {evt.details}
+                        {evt.txHash && (
                           <>
                             {" · "}
                             <a
-                              href={`${ETHERSCAN_URL}/${txHash}`}
+                              href={evt.explorerUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="font-mono inline-flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
@@ -165,13 +221,13 @@ export function PayrollHistory({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {isPayroll && txHash && (
+                    {evt.isPayroll && evt.txHash && evt._type === "payroll" && (
                       <button
                         onClick={() =>
                           setReceiptEvent({
-                            txHash: txHash as string,
-                            blockNumber: evt.blockNumber ?? BigInt(0),
-                            employeeCount: Number(args.employeeCount ?? 0),
+                            txHash: evt.txHash,
+                            blockNumber: evt.blockNumber,
+                            employeeCount: Number((evt.rawEvent.args as any)?.employeeCount ?? 0),
                           })
                         }
                         className="flex items-center gap-1 rounded-full bg-[rgba(255,255,255,0.03)] border border-[var(--border)] px-2 py-0.5 text-[10px] sm:text-xs font-medium text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--border-accent)] transition-colors"

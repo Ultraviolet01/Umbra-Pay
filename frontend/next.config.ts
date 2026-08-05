@@ -1,15 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
-  webpack: (config) => {
-    // Enable WASM support for @zama-fhe/relayer-sdk
-    config.experiments = {
-      ...config.experiments,
-      asyncWebAssembly: true,
-      layers: true,
+  webpack: (config, { webpack }) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
     };
-
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^@x402\//,
+      })
+    );
     return config;
   },
 };

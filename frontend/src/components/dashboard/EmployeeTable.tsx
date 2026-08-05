@@ -2,12 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, Copy, Check, Users, Trash2, Loader2, Edit3, Eye, EyeOff, Lock } from "lucide-react";
-import { useReadContracts } from "wagmi";
-import { formatUnits } from "viem";
+import { Search, Plus, Copy, Check, Users, Trash2, Loader2, Edit3, Eye, EyeOff } from "lucide-react";
 import { EncryptedValue } from "@/components/shared/EncryptedValue";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
-import { useFhevm } from "@/hooks/useFhevm";
 import type { Employee } from "@/lib/mock-data";
 
 interface EmployeeTableProps {
@@ -18,46 +14,36 @@ interface EmployeeTableProps {
   orgAddress?: `0x${string}`;
   tokenSymbol?: string;
   tokenDecimals?: number;
-  /** Address currently being removed - only that row shows spinner */
   removingAddress?: `0x${string}` | null;
-  /** @deprecated Use removingAddress instead */
   isRemoving?: boolean;
-  /** Increment this to clear revealed salaries and force re-fetch */
   salaryVersion?: number;
 }
 
-export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUpdateSalary, orgAddress, tokenSymbol = "ETH", tokenDecimals = 18, removingAddress, isRemoving, salaryVersion = 0 }: EmployeeTableProps) {
+export function EmployeeTable({
+  employees,
+  onAddEmployee,
+  onRemoveEmployee,
+  onUpdateSalary,
+  orgAddress,
+  tokenSymbol = "ETH",
+  removingAddress,
+  salaryVersion = 0,
+}: EmployeeTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
 
-  // Bulk salary reveal state
   const [revealedSalaries, setRevealedSalaries] = useState<Record<string, string>>({});
   const [isRevealing, setIsRevealing] = useState(false);
-  const [revealProgress, setRevealProgress] = useState(0);
   const allRevealed = employees.length > 0 && employees.every((emp) => revealedSalaries[emp.fullAddress.toLowerCase()]);
 
-  const { decryptMultiple, isReady } = useFhevm();
-
-  // Clear revealed salaries when a salary is updated
   useEffect(() => {
     if (salaryVersion > 0) {
       setRevealedSalaries({});
     }
   }, [salaryVersion]);
 
-  // Batch-fetch all salary handles
-  const { data: salaryHandles, refetch: refetchHandles } = useReadContracts({
-    contracts: employees.map((emp) => ({
-      address: orgAddress!,
-      abi: ORGANIZATION_ABI,
-      functionName: "salaryOf" as const,
-      args: [emp.fullAddress as `0x${string}`],
-    })),
-    query: { enabled: !!orgAddress && employees.length > 0 },
-  });
-
   const handleRevealAll = useCallback(async () => {
-    if (!isReady || !orgAddress || employees.length === 0) return;
+    if (!orgAddress || employees.length === 0) return;
 
     if (allRevealed) {
       setRevealedSalaries({});
@@ -65,87 +51,34 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
     }
 
     setIsRevealing(true);
-    setRevealProgress(0);
 
     try {
-      const { data: freshHandles } = await refetchHandles();
-      const handles = freshHandles ?? salaryHandles;
-
-      const ZERO_HANDLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
-
-      // Collect all valid handles for batch decryption
-      const toDecrypt: { handle: `0x${string}`; contractAddress: `0x${string}`; empAddr: string }[] = [];
       const results: Record<string, string> = {};
 
-      for (let i = 0; i < employees.length; i++) {
-        const emp = employees[i];
-        const handleResult = handles?.[i];
-        const handle = handleResult?.status === "success" ? (handleResult.result as `0x${string}`) : null;
-
-        if (!handle || handle === ZERO_HANDLE) {
-          results[emp.fullAddress.toLowerCase()] = "0";
+      for (const emp of employees) {
+        const res = await fetch("/api/enclave", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "get_balance",
+            employeeAddress: emp.fullAddress,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          results[emp.fullAddress.toLowerCase()] = data.balanceEth;
         } else {
-          toDecrypt.push({
-            handle,
-            contractAddress: orgAddress,
-            empAddr: emp.fullAddress.toLowerCase(),
-          });
+          results[emp.fullAddress.toLowerCase()] = "0";
         }
       }
 
-      // ONE signature for ALL employees
-      if (toDecrypt.length > 0) {
-        try {
-          const decryptedMap = await decryptMultiple(
-            toDecrypt.map((d) => ({ handle: d.handle, contractAddress: d.contractAddress }))
-          );
-
-          // Map results back to employee addresses
-          for (const item of toDecrypt) {
-            const handleLower = item.handle.toLowerCase();
-            let raw: bigint | null = null;
-
-            // Try exact match
-            const val = decryptedMap[item.handle] ?? decryptedMap[handleLower];
-            if (val !== undefined) {
-              raw = typeof val === "bigint" ? val : BigInt(String(val));
-            } else {
-              // Fallback: search case-insensitive
-              for (const [key, v] of Object.entries(decryptedMap)) {
-                if (key.toLowerCase() === handleLower) {
-                  raw = typeof v === "bigint" ? v : BigInt(String(v));
-                  break;
-                }
-              }
-            }
-
-            if (raw !== null) {
-              const humanReadable = formatUnits(raw, tokenDecimals);
-              const num = parseFloat(humanReadable);
-              results[item.empAddr] = num.toLocaleString(undefined, {
-                minimumFractionDigits: num < 1 ? 6 : 2,
-                maximumFractionDigits: num < 1 ? 6 : 2,
-              });
-            } else {
-              results[item.empAddr] = "Error";
-            }
-          }
-        } catch (err) {
-          console.error("[RevealAll] Batch decrypt failed:", err);
-          for (const item of toDecrypt) {
-            results[item.empAddr] = "Error";
-          }
-        }
-      }
-
-      setRevealProgress(employees.length);
       setRevealedSalaries(results);
     } catch (err) {
       console.error("[RevealAll] Error:", err);
     } finally {
       setIsRevealing(false);
     }
-  }, [isReady, orgAddress, employees, allRevealed, decryptMultiple, tokenDecimals, refetchHandles, salaryHandles]);
+  }, [orgAddress, employees, allRevealed]);
 
   const filteredEmployees = employees.filter(
     (emp) =>
@@ -168,7 +101,6 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
       className="lg:col-span-2"
     >
       <div className="glass-card overflow-hidden !hover:transform-none">
-        {/* Header */}
         <div className="flex flex-col gap-3 border-b border-[var(--border)] p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-muted)] shrink-0">
@@ -182,16 +114,15 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
                 Employees
               </h2>
               <p className="text-xs text-[var(--text-muted)]">
-                {employees.length} members &middot; Salaries encrypted
+                {employees.length} members &middot; Salaries TEE Protected
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Reveal All Salaries button */}
             {orgAddress && employees.length > 0 && (
               <button
                 onClick={handleRevealAll}
-                disabled={isRevealing || !isReady}
+                disabled={isRevealing}
                 className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   allRevealed
                     ? "border-[var(--border-accent)] bg-[rgba(0,229,160,0.06)] text-[var(--accent)] hover:bg-[rgba(0,229,160,0.1)]"
@@ -201,7 +132,7 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
                 {isRevealing ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Decrypting...</span>
+                    <span>Querying TEE...</span>
                   </>
                 ) : allRevealed ? (
                   <>
@@ -236,7 +167,6 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
           </div>
         </div>
 
-        {/* Mobile card layout */}
         <div className="sm:hidden divide-y divide-[var(--border)]">
           {filteredEmployees.length === 0 ? (
             <div className="py-8 text-center text-xs text-[var(--text-muted)]">
@@ -261,7 +191,6 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
           )}
         </div>
 
-        {/* Desktop table layout */}
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -284,7 +213,7 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
                   onCopy={handleCopy}
                   onRemove={onRemoveEmployee}
                   onUpdateSalary={onUpdateSalary}
-                salariesRevealed={allRevealed}
+                  salariesRevealed={allRevealed}
                   revealedSalary={revealedSalaries[emp.fullAddress.toLowerCase()]}
                   tokenSymbol={tokenSymbol}
                   isRemoving={removingAddress?.toLowerCase() === emp.fullAddress.toLowerCase() || false}
@@ -299,7 +228,6 @@ export function EmployeeTable({ employees, onAddEmployee, onRemoveEmployee, onUp
   );
 }
 
-/** Salary display - shows encrypted or revealed value */
 function SalaryDisplay({ salary, tokenSymbol, compact }: { salary?: string; tokenSymbol: string; compact?: boolean }) {
   return (
     <AnimatePresence mode="wait">
@@ -336,7 +264,6 @@ function SalaryDisplay({ salary, tokenSymbol, compact }: { salary?: string; toke
   );
 }
 
-/** Mobile card view for each employee */
 function MobileEmployeeCard({
   employee: emp,
   copied,
@@ -405,11 +332,6 @@ function MobileEmployeeCard({
                 >
                   <Edit3 className="h-3 w-3" />
                 </button>
-                {!salariesRevealed && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[10px] text-[var(--text-secondary)] whitespace-nowrap opacity-0 group-hover/edit:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
-                    Reveal salaries first
-                  </div>
-                )}
               </div>
             )}
             {onRemove && (
@@ -542,11 +464,6 @@ function EmployeeRow({
               >
                 <Edit3 className="h-3.5 w-3.5" />
               </button>
-              {!salariesRevealed && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[10px] text-[var(--text-secondary)] whitespace-nowrap opacity-0 group-hover/edit:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
-                  Reveal salaries first
-                </div>
-              )}
             </div>
           )}
           {onRemove && (

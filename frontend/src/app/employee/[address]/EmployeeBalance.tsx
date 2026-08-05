@@ -4,8 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Lock, Shield } from "lucide-react";
 import Link from "next/link";
-import { useAccount, useReadContract } from "wagmi";
-import { formatUnits } from "viem";
+import { useAccount } from "wagmi";
 import { AppNav } from "@/components/shared/AppNav";
 import { WalletConnect } from "@/components/shared/WalletConnect";
 import { BalanceCard } from "@/components/employee/BalanceCard";
@@ -14,9 +13,6 @@ import { WithdrawCard } from "@/components/employee/WithdrawCard";
 import { PrivacyInfo } from "@/components/employee/PrivacyInfo";
 import { OrgInfo } from "@/components/employee/OrgInfo";
 import { useOrganization } from "@/hooks/useOrganization";
-import { useERC20 } from "@/hooks/useERC20";
-import { useFhevm } from "@/hooks/useFhevm";
-import { ORGANIZATION_ABI } from "@/lib/contracts";
 import { fadeUpSmall } from "@/lib/animations";
 import {
   Hexagon,
@@ -27,8 +23,6 @@ import {
   Dot,
 } from "@/components/shared/Stars";
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string}`;
-
 export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${string}` }) {
   const { address: connectedAddress, isConnected } = useAccount();
 
@@ -37,34 +31,14 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
   const [decryptedBalance, setDecryptedBalance] = useState<string | null>(null);
   const [decryptError, setDecryptError] = useState("");
 
-  const { decryptBalance } = useFhevm();
-
   const {
     orgName,
-    paymentToken,
     createdAt,
-    isETH,
     refetchBalance,
   } = useOrganization(orgAddress);
 
-  const { data: balanceHandle, refetch: refetchHandle } = useReadContract({
-    address: orgAddress,
-    abi: ORGANIZATION_ABI,
-    functionName: "balanceOf",
-    args: connectedAddress ? [connectedAddress] : undefined,
-    query: { enabled: !!connectedAddress },
-  });
-
-  const {
-    symbol: tokenSymbol,
-    decimals: tokenDecimals,
-  } = useERC20(
-    !isETH && paymentToken ? paymentToken : undefined,
-    orgAddress,
-  );
-
-  const displaySymbol = isETH ? "ETH" : tokenSymbol || "TOKEN";
-  const displayDecimals = isETH ? 18 : tokenDecimals ?? 18;
+  const displaySymbol = "ETH";
+  const displayDecimals = 18;
 
   const handleRevealBalance = async () => {
     if (isBalanceRevealed) {
@@ -79,30 +53,24 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
     setDecryptError("");
 
     try {
-      const { data: freshHandle } = await refetchHandle();
-      const handle = (freshHandle ?? balanceHandle) as `0x${string}`;
-
-      if (!handle || handle === "0x0000000000000000000000000000000000000000000000000000000000000000") {
-        setDecryptedBalance("0.000000");
-        setIsBalanceRevealed(true);
-        setIsDecrypting(false);
-        return;
-      }
-
-      const result = await decryptBalance(handle, orgAddress);
-      const raw = typeof result === "bigint" ? result : BigInt(String(result));
-      const humanReadable = formatUnits(raw, displayDecimals);
-      const num = parseFloat(humanReadable);
-      const formatted = num.toLocaleString(undefined, {
-        minimumFractionDigits: 6,
-        maximumFractionDigits: 6,
+      const res = await fetch("/api/enclave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_balance",
+          employeeAddress: connectedAddress,
+        }),
       });
-      setDecryptedBalance(formatted);
-      setDecryptError("");
-      setIsBalanceRevealed(true);
+      const data = await res.json();
+      if (data.success) {
+        setDecryptedBalance(data.balanceEth);
+        setIsBalanceRevealed(true);
+      } else {
+        setDecryptError(data.error || "TEE Query failed");
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to decrypt balance";
-      console.error("[Decrypt] Error:", err);
+      const message = err instanceof Error ? err.message : "Failed to query TEE balance";
+      console.error("[TEE Query] Error:", err);
       setDecryptError(message);
       setDecryptedBalance(null);
     } finally {
@@ -167,7 +135,6 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
           </div>
         ) : (
         <div className="py-4 sm:py-8">
-          {/* Header */}
           <motion.div
             initial="hidden"
             animate="visible"
@@ -196,7 +163,7 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
                     </h1>
                     <p className="mt-0.5 text-xs sm:text-sm text-[var(--text-secondary)]">
                       {orgCreatedDate ? `Created ${orgCreatedDate} · ` : ""}
-                      Paying in {displaySymbol}
+                      Paying in ETH
                     </p>
                   </div>
                 </div>
@@ -204,7 +171,7 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
                   <div className="flex items-center gap-2 rounded-full border border-[var(--border-accent)] bg-[var(--accent-muted)] px-3 py-1.5">
                     <Lock className="h-3 w-3 text-[var(--accent)]" />
                     <span className="text-xs font-medium text-[var(--accent)]">
-                      {isBalanceRevealed ? "Decrypted" : "Encrypted"}
+                      {isBalanceRevealed ? "TEE Attested" : "TEE Encrypted"}
                     </span>
                   </div>
                 </div>
@@ -212,7 +179,6 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
             </motion.div>
           </motion.div>
 
-          {/* Decrypt error */}
           {decryptError && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -220,9 +186,6 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
               className="mb-4 rounded-xl bg-red-500/10 border border-red-500/20 p-4"
             >
               <p className="text-xs text-red-400">{decryptError}</p>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                FHE decryption may not be available on Sepolia testnet. You can still withdraw funds.
-              </p>
             </motion.div>
           )}
 
@@ -231,7 +194,7 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
               <BalanceCard
                 balance={decryptedBalance}
                 tokenSymbol={displaySymbol}
-                isETH={isETH}
+                isETH={true}
                 isRevealed={isBalanceRevealed}
                 isDecrypting={isDecrypting}
                 onToggleReveal={handleRevealBalance}
