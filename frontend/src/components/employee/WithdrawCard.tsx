@@ -12,7 +12,7 @@ interface WithdrawCardProps {
   tokenSymbol: string;
   tokenDecimals: number;
   maxBalance: string | null;
-  onWithdrawSuccess?: () => void;
+  onWithdrawSuccess?: (newBalanceEth?: string) => void;
 }
 
 const WITHDRAW_STEPS = [
@@ -58,18 +58,23 @@ export function WithdrawCard({
           employeeAddress: connectedAddress,
           amountEth: amount,
         }),
-      }).then(() => {
-        setWithdrawnAmount(amount);
-        setIsSuccess(true);
-        onWithdrawSuccess?.();
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setWithdrawnAmount(amount);
+          setIsSuccess(true);
+          onWithdrawSuccess?.(data.newBalanceEth);
 
-        setTimeout(() => {
-          setIsSuccess(false);
-          setAmount("");
-          setWithdrawStep(0);
-          reset();
-        }, 3000);
-      });
+          setTimeout(() => {
+            setIsSuccess(false);
+            setAmount("");
+            setWithdrawStep(0);
+            reset();
+          }, 3000);
+        })
+        .catch((err) => {
+          console.error("Enclave withdraw error:", err);
+        });
     }
   }, [isTxConfirmed, withdrawStep, amount, connectedAddress, onWithdrawSuccess, reset]);
 

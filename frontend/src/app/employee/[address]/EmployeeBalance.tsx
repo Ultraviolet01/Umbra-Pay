@@ -78,6 +78,35 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
     }
   };
 
+  const fetchEmployeeBalance = async () => {
+    if (!connectedAddress) return;
+    try {
+      const res = await fetch("/api/enclave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_balance",
+          employeeAddress: connectedAddress,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDecryptedBalance(data.balanceEth);
+      }
+    } catch (err: unknown) {
+      console.error("[TEE Query] Refresh error:", err);
+    }
+  };
+
+  const handleWithdrawSuccess = (newBalanceEth?: string) => {
+    refetchBalance();
+    if (newBalanceEth !== undefined) {
+      setDecryptedBalance(newBalanceEth);
+    } else {
+      fetchEmployeeBalance();
+    }
+  };
+
   const orgCreatedDate = createdAt
     ? new Date(Number(createdAt) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : undefined;
@@ -218,7 +247,7 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
                 tokenSymbol={displaySymbol}
                 tokenDecimals={displayDecimals}
                 maxBalance={isBalanceRevealed ? decryptedBalance : null}
-                onWithdrawSuccess={refetchBalance}
+                onWithdrawSuccess={handleWithdrawSuccess}
               />
               <PrivacyInfo />
               <OrgInfo
