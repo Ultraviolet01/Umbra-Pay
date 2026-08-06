@@ -237,9 +237,8 @@ export function useOrganization(orgAddress?: `0x${string}`) {
   const [enclaveVaultBalance, setEnclaveVaultBalance] = useState<bigint | null>(null);
 
   const fetchEnclaveBalance = useCallback(async () => {
-    if (!orgAddress) return;
     try {
-      const res = await fetch(`/api/enclave?action=solvency&orgAddress=${orgAddress}`);
+      const res = await fetch(`/api/enclave?action=vaultBalance`);
       const data = await res.json();
       if (data && data.vaultBalanceWei !== undefined) {
         setEnclaveVaultBalance(BigInt(data.vaultBalanceWei));
@@ -247,7 +246,7 @@ export function useOrganization(orgAddress?: `0x${string}`) {
     } catch (e) {
       console.error("Fetch enclave balance error:", e);
     }
-  }, [orgAddress]);
+  }, []);
 
   useEffect(() => {
     fetchEnclaveBalance();

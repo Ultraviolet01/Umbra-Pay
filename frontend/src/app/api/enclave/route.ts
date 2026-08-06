@@ -72,8 +72,20 @@ export async function GET(req: Request) {
     }
   }
 
+  if (action === "vaultBalance") {
+    // Lightweight balance check — no attestation signing required
+    return NextResponse.json({
+      vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
+      vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
+    });
+  }
+
   if (action === "solvency") {
-    const orgAddress = searchParams.get("orgAddress") || "0x0000000000000000000000000000000000000000";
+    const rawOrg = searchParams.get("orgAddress") || "";
+    // Validate address — must be 42 chars (0x + 40 hex). Fallback to zero address.
+    const isValidAddr = /^0x[0-9a-fA-F]{40}$/.test(rawOrg);
+    const orgAddress = isValidAddr ? rawOrg : "0x0000000000000000000000000000000000000000";
+
     let totalPayrollCostWei = BigInt(0);
     for (const val of Object.values(state.employeeSalaries)) {
       totalPayrollCostWei += val;
@@ -82,31 +94,44 @@ export async function GET(req: Request) {
     const isSolvent = state.sepoliaVaultBalanceWei >= totalPayrollCostWei;
     const now = Math.floor(Date.now() / 1000);
 
-    const messageHash = ethers.solidityPackedKeccak256(
-      ["address", "bool", "uint256", "uint256", "uint256", "uint256"],
-      [
-        orgAddress.toLowerCase(),
+    try {
+      const messageHash = ethers.solidityPackedKeccak256(
+        ["address", "bool", "uint256", "uint256", "uint256", "uint256"],
+        [
+          orgAddress,
+          isSolvent,
+          totalPayrollCostWei,
+          state.sepoliaVaultBalanceWei,
+          Object.keys(state.employeeSalaries).length,
+          now,
+        ]
+      );
+
+      const attestationSignature = await teeWallet.signMessage(ethers.getBytes(messageHash));
+
+      return NextResponse.json({
         isSolvent,
-        totalPayrollCostWei,
-        state.sepoliaVaultBalanceWei,
-        Object.keys(state.employeeSalaries).length,
-        now,
-      ]
-    );
-
-    const attestationSignature = await teeWallet.signMessage(ethers.getBytes(messageHash));
-
-    return NextResponse.json({
-      isSolvent,
-      totalPayrollCostWei: totalPayrollCostWei.toString(),
-      totalPayrollCostEth: ethers.formatEther(totalPayrollCostWei),
-      vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
-      vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
-      employeeCount: Object.keys(state.employeeSalaries).length,
-      timestamp: now,
-      attestationSignature,
-      enclaveAddress: teeWallet.address,
-    });
+        totalPayrollCostWei: totalPayrollCostWei.toString(),
+        totalPayrollCostEth: ethers.formatEther(totalPayrollCostWei),
+        vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
+        vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
+        employeeCount: Object.keys(state.employeeSalaries).length,
+        timestamp: now,
+        attestationSignature,
+        enclaveAddress: teeWallet.address,
+      });
+    } catch (err: any) {
+      // Attestation failed — still return balance data without signature
+      return NextResponse.json({
+        isSolvent,
+        totalPayrollCostWei: totalPayrollCostWei.toString(),
+        totalPayrollCostEth: ethers.formatEther(totalPayrollCostWei),
+        vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
+        vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
+        employeeCount: Object.keys(state.employeeSalaries).length,
+        timestamp: now,
+      });
+    }
   }
 
   return NextResponse.json({
