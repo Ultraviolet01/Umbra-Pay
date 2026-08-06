@@ -28,3 +28,6 @@ yarn-error.log*
 .vercel
 .DS_Store
 *.tsbuildinfo
+
+# Enclave state (local persistence, do not commit)
+.enclave-state.json
