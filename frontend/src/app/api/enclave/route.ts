@@ -1,85 +1,16 @@
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
-import fs from "fs";
-import path from "path";
+import { getOrg, updateOrg } from "@/lib/enclaveDb";
 
 const TEE_PRIVATE_KEY = process.env.TEE_PRIVATE_KEY || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const teeWallet = new ethers.Wallet(TEE_PRIVATE_KEY);
 
-// Persist state to disk so it survives server restarts / hot reloads
-const STATE_FILE = path.join(process.cwd(), ".enclave-state.json");
-
-interface PersistedState {
-  sepoliaVaultBalanceWei: string; // stored as decimal string
-  employeeBalances: Record<string, string>;
-  employeeSalaries: Record<string, string>;
-  payrollRunCount: number;
-}
-
-interface EnclaveState {
-  sepoliaVaultBalanceWei: bigint;
-  employeeBalances: Record<string, bigint>;
-  employeeSalaries: Record<string, bigint>;
-  payrollRunCount: number;
-}
-
-function loadState(): EnclaveState {
-  try {
-    if (fs.existsSync(STATE_FILE)) {
-      const raw = fs.readFileSync(STATE_FILE, "utf-8");
-      const parsed: PersistedState = JSON.parse(raw);
-      return {
-        sepoliaVaultBalanceWei: BigInt(parsed.sepoliaVaultBalanceWei || "0"),
-        employeeBalances: Object.fromEntries(
-          Object.entries(parsed.employeeBalances || {}).map(([k, v]) => [k, BigInt(v)])
-        ),
-        employeeSalaries: Object.fromEntries(
-          Object.entries(parsed.employeeSalaries || {}).map(([k, v]) => [k, BigInt(v)])
-        ),
-        payrollRunCount: parsed.payrollRunCount || 0,
-      };
-    }
-  } catch (e) {
-    console.error("[Enclave] Failed to load state from disk:", e);
-  }
-  // Default initial state (no seeded mock data)
-  return {
-    sepoliaVaultBalanceWei: BigInt(0),
-    employeeBalances: {},
-    employeeSalaries: {},
-    payrollRunCount: 0,
-  };
-}
-
-function saveState(s: EnclaveState) {
-  try {
-    const persisted: PersistedState = {
-      sepoliaVaultBalanceWei: s.sepoliaVaultBalanceWei.toString(),
-      employeeBalances: Object.fromEntries(
-        Object.entries(s.employeeBalances).map(([k, v]) => [k, v.toString()])
-      ),
-      employeeSalaries: Object.fromEntries(
-        Object.entries(s.employeeSalaries).map(([k, v]) => [k, v.toString()])
-      ),
-      payrollRunCount: s.payrollRunCount,
-    };
-    fs.writeFileSync(STATE_FILE, JSON.stringify(persisted, null, 2), "utf-8");
-  } catch (e) {
-    console.error("[Enclave] Failed to persist state:", e);
-  }
-}
-
-// Use globalThis as an in-process cache; load from disk if not yet initialized
-if (!(globalThis as any).__umbraEnclaveState) {
-  (globalThis as any).__umbraEnclaveState = loadState();
-}
-
-const state: EnclaveState = (globalThis as any).__umbraEnclaveState;
-
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");
+  const orgAddress = searchParams.get("orgAddress");
+
+  const org = getOrg(orgAddress);
 
   if (action === "balance") {
     const address = searchParams.get("address")?.toLowerCase();
@@ -98,12 +29,8 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Invalid signature authentication" }, { status: 401 });
       }
 
-      let balWei = state.employeeBalances[address];
-      if (balWei === undefined) {
-        balWei = BigInt(0);
-      }
-
-      const salaryWei = state.employeeSalaries[address] || BigInt(0);
+      const balWei = BigInt(org.employeeBalances[address] || "0");
+      const salaryWei = BigInt(org.employeeSalaries[address] || "100000000000000000"); // 0.1 ETH fallback
 
       return NextResponse.json({
         address,
@@ -120,36 +47,37 @@ export async function GET(req: Request) {
   }
 
   if (action === "vaultBalance") {
-    // Lightweight balance check — no attestation signing required
+    const vaultWei = BigInt(org.vaultBalanceWei || "0");
     return NextResponse.json({
-      vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
-      vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
+      vaultBalanceWei: vaultWei.toString(),
+      vaultBalanceEth: ethers.formatEther(vaultWei),
     });
   }
 
   if (action === "solvency") {
-    const rawOrg = searchParams.get("orgAddress") || "";
-    // Validate address — must be 42 chars (0x + 40 hex). Fallback to zero address.
+    const rawOrg = orgAddress || "";
     const isValidAddr = /^0x[0-9a-fA-F]{40}$/.test(rawOrg);
-    const orgAddress = isValidAddr ? rawOrg : "0x0000000000000000000000000000000000000000";
+    const validOrgAddr = isValidAddr ? rawOrg : "0x0000000000000000000000000000000000000000";
 
     let totalPayrollCostWei = BigInt(0);
-    for (const val of Object.values(state.employeeSalaries)) {
-      totalPayrollCostWei += val;
+    for (const valStr of Object.values(org.employeeSalaries)) {
+      totalPayrollCostWei += BigInt(valStr);
     }
 
-    const isSolvent = state.sepoliaVaultBalanceWei >= totalPayrollCostWei;
+    const vaultWei = BigInt(org.vaultBalanceWei || "0");
+    const isSolvent = vaultWei >= totalPayrollCostWei;
     const now = Math.floor(Date.now() / 1000);
+    const empCount = Object.keys(org.employeeSalaries).length;
 
     try {
       const messageHash = ethers.solidityPackedKeccak256(
         ["address", "bool", "uint256", "uint256", "uint256", "uint256"],
         [
-          orgAddress,
+          validOrgAddr,
           isSolvent,
           totalPayrollCostWei,
-          state.sepoliaVaultBalanceWei,
-          Object.keys(state.employeeSalaries).length,
+          vaultWei,
+          empCount,
           now,
         ]
       );
@@ -160,22 +88,21 @@ export async function GET(req: Request) {
         isSolvent,
         totalPayrollCostWei: totalPayrollCostWei.toString(),
         totalPayrollCostEth: ethers.formatEther(totalPayrollCostWei),
-        vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
-        vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
-        employeeCount: Object.keys(state.employeeSalaries).length,
+        vaultBalanceWei: vaultWei.toString(),
+        vaultBalanceEth: ethers.formatEther(vaultWei),
+        employeeCount: empCount,
         timestamp: now,
         attestationSignature,
         enclaveAddress: teeWallet.address,
       });
     } catch (err: any) {
-      // Attestation failed — still return balance data without signature
       return NextResponse.json({
         isSolvent,
         totalPayrollCostWei: totalPayrollCostWei.toString(),
         totalPayrollCostEth: ethers.formatEther(totalPayrollCostWei),
-        vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
-        vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
-        employeeCount: Object.keys(state.employeeSalaries).length,
+        vaultBalanceWei: vaultWei.toString(),
+        vaultBalanceEth: ethers.formatEther(vaultWei),
+        employeeCount: empCount,
         timestamp: now,
       });
     }
@@ -191,11 +118,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, employeeAddress, amountEth, salaryEth, sepoliaRecipient, depositAmountEth, employees } = body;
+    const { action, employeeAddress, amountEth, salaryEth, sepoliaRecipient, depositAmountEth, employees, orgAddress } = body;
+
+    const org = getOrg(orgAddress);
 
     if (action === "get_salary") {
       const emp = (employeeAddress || "").toLowerCase();
-      const salWei = state.employeeSalaries[emp] || ethers.parseEther("0.1");
+      const salStr = org.employeeSalaries[emp] || "100000000000000000"; // 0.1 ETH default
+      const salWei = BigInt(salStr);
       return NextResponse.json({
         success: true,
         employeeAddress: emp,
@@ -206,12 +136,8 @@ export async function POST(req: Request) {
 
     if (action === "get_balance") {
       const emp = (employeeAddress || "").toLowerCase();
-      let balWei = state.employeeBalances[emp];
-      const salWei = state.employeeSalaries[emp] || ethers.parseEther("0.1");
-
-      if (balWei === undefined) {
-        balWei = BigInt(0);
-      }
+      const balWei = BigInt(org.employeeBalances[emp] || "0");
+      const salWei = BigInt(org.employeeSalaries[emp] || "100000000000000000");
 
       return NextResponse.json({
         success: true,
@@ -223,64 +149,89 @@ export async function POST(req: Request) {
 
     if (action === "deposit") {
       const depositWei = ethers.parseEther(depositAmountEth || "0");
-      state.sepoliaVaultBalanceWei += depositWei;
-      saveState(state);
+      const updatedOrg = updateOrg(orgAddress, (state) => {
+        const currentWei = BigInt(state.vaultBalanceWei || "0");
+        state.vaultBalanceWei = (currentWei + depositWei).toString();
+        state.deposits.unshift({
+          amountEth: depositAmountEth || "0",
+          timestamp: Date.now(),
+        });
+      });
+
       return NextResponse.json({
         success: true,
-        vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
-        vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
+        vaultBalanceEth: ethers.formatEther(BigInt(updatedOrg.vaultBalanceWei)),
+        vaultBalanceWei: updatedOrg.vaultBalanceWei,
       });
     }
 
     if (action === "add_employee") {
       const emp = (employeeAddress || "").toLowerCase();
       const salWei = ethers.parseEther(salaryEth || "0.1");
-      state.employeeSalaries[emp] = salWei;
-      if (state.employeeBalances[emp] === undefined) {
-        state.employeeBalances[emp] = BigInt(0);
-      }
-      saveState(state);
+
+      updateOrg(orgAddress, (state) => {
+        state.employeeSalaries[emp] = salWei.toString();
+        if (state.employeeBalances[emp] === undefined) {
+          state.employeeBalances[emp] = "0";
+        }
+      });
+
       return NextResponse.json({ success: true, employee: emp, salaryEth: ethers.formatEther(salWei) });
     }
 
     if (action === "run_payroll") {
-      state.payrollRunCount++;
       const empList = Array.isArray(employees) ? employees : [];
 
       let totalRunCostWei = BigInt(0);
 
-      if (empList.length > 0) {
-        for (const empObj of empList) {
-          const empAddr = (typeof empObj === "string" ? empObj : empObj.address || "").toLowerCase();
-          if (!empAddr) continue;
-          const salEth = typeof empObj === "object" && empObj.salaryEth ? empObj.salaryEth : "0.1";
-          const salWei = ethers.parseEther(salEth);
-          state.employeeSalaries[empAddr] = salWei;
-          state.employeeBalances[empAddr] = (state.employeeBalances[empAddr] || BigInt(0)) + salWei;
-          totalRunCostWei += salWei;
-        }
-      } else {
-        for (const emp of Object.keys(state.employeeSalaries)) {
-          const sal = state.employeeSalaries[emp];
-          state.employeeBalances[emp] = (state.employeeBalances[emp] || BigInt(0)) + sal;
-          totalRunCostWei += sal;
-        }
-      }
+      const updatedOrg = updateOrg(orgAddress, (state) => {
+        state.payrollRunCount++;
 
-      if (state.sepoliaVaultBalanceWei >= totalRunCostWei) {
-        state.sepoliaVaultBalanceWei -= totalRunCostWei;
-      } else {
-        state.sepoliaVaultBalanceWei = BigInt(0);
-      }
+        if (empList.length > 0) {
+          for (const empObj of empList) {
+            const empAddr = (typeof empObj === "string" ? empObj : empObj.address || "").toLowerCase();
+            if (!empAddr) continue;
+            const salEth = typeof empObj === "object" && empObj.salaryEth ? empObj.salaryEth : "0.1";
+            const salWei = ethers.parseEther(salEth);
+            state.employeeSalaries[empAddr] = salWei.toString();
 
-      saveState(state);
+            const curBalWei = BigInt(state.employeeBalances[empAddr] || "0");
+            state.employeeBalances[empAddr] = (curBalWei + salWei).toString();
+            totalRunCostWei += salWei;
+          }
+        } else {
+          for (const [emp, salStr] of Object.entries(state.employeeSalaries)) {
+            const salWei = BigInt(salStr);
+            const curBalWei = BigInt(state.employeeBalances[emp] || "0");
+            state.employeeBalances[emp] = (curBalWei + salWei).toString();
+            totalRunCostWei += salWei;
+          }
+        }
+
+        const currentVaultWei = BigInt(state.vaultBalanceWei || "0");
+        if (currentVaultWei >= totalRunCostWei) {
+          state.vaultBalanceWei = (currentVaultWei - totalRunCostWei).toString();
+        } else {
+          state.vaultBalanceWei = "0";
+        }
+
+        state.payrollHistory.unshift({
+          runId: state.payrollRunCount,
+          executedCostEth: ethers.formatEther(totalRunCostWei),
+          employeeCount: empList.length || Object.keys(state.employeeSalaries).length,
+          timestamp: Date.now(),
+        });
+      });
+
+      const remainingVaultWei = BigInt(updatedOrg.vaultBalanceWei);
+
       return NextResponse.json({
         success: true,
-        payrollRunCount: state.payrollRunCount,
+        payrollRunCount: updatedOrg.payrollRunCount,
         executedCostWei: totalRunCostWei.toString(),
         executedCostEth: ethers.formatEther(totalRunCostWei),
-        remainingVaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
-        remainingVaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
+        remainingVaultBalanceEth: ethers.formatEther(remainingVaultWei),
+        remainingVaultBalanceWei: remainingVaultWei.toString(),
       });
     }
 
@@ -288,17 +239,15 @@ export async function POST(req: Request) {
       const emp = (employeeAddress || "").toLowerCase();
       const amountWei = ethers.parseEther(amountEth || "0");
 
-      if ((state.employeeBalances[emp] || BigInt(0)) < amountWei) {
+      const curEmpBalWei = BigInt(org.employeeBalances[emp] || "0");
+      if (curEmpBalWei < amountWei) {
         return NextResponse.json({ error: "Insufficient enclave balance" }, { status: 400 });
       }
 
-      if (state.sepoliaVaultBalanceWei < amountWei) {
+      const curVaultWei = BigInt(org.vaultBalanceWei || "0");
+      if (curVaultWei < amountWei) {
         return NextResponse.json({ error: "Insufficient Sepolia Vault ETH liquidity" }, { status: 400 });
       }
-
-      state.employeeBalances[emp] -= amountWei;
-      state.sepoliaVaultBalanceWei -= amountWei;
-      saveState(state);
 
       const txHash = ethers.keccak256(
         ethers.solidityPacked(
@@ -307,11 +256,27 @@ export async function POST(req: Request) {
         )
       );
 
+      const updatedOrg = updateOrg(orgAddress, (state) => {
+        const ebWei = BigInt(state.employeeBalances[emp] || "0");
+        const vbWei = BigInt(state.vaultBalanceWei || "0");
+        state.employeeBalances[emp] = (ebWei - amountWei).toString();
+        state.vaultBalanceWei = (vbWei - amountWei).toString();
+
+        state.withdrawals.unshift({
+          txHash,
+          employeeAddress: emp,
+          amountEth: amountEth || "0",
+          timestamp: Date.now(),
+        });
+      });
+
+      const newEmpBalWei = BigInt(updatedOrg.employeeBalances[emp] || "0");
+
       return NextResponse.json({
         success: true,
         txHash,
         settledOnChain: "Ethereum Sepolia (11155111)",
-        newBalanceEth: ethers.formatEther(state.employeeBalances[emp]),
+        newBalanceEth: ethers.formatEther(newEmpBalWei),
       });
     }
 

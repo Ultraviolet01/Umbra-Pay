@@ -105,6 +105,7 @@ export function DepositCard({
         body: JSON.stringify({
           action: "deposit",
           depositAmountEth: depositedAmount || amount,
+          orgAddress,
         }),
       })
         .then(() => {

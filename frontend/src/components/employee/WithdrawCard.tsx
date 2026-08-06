@@ -57,6 +57,7 @@ export function WithdrawCard({
           action: "withdraw",
           employeeAddress: connectedAddress,
           amountEth: amount,
+          orgAddress,
         }),
       })
         .then((res) => res.json())

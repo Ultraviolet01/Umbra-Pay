@@ -59,6 +59,7 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
         body: JSON.stringify({
           action: "get_balance",
           employeeAddress: connectedAddress,
+          orgAddress,
         }),
       });
       const data = await res.json();
@@ -87,6 +88,7 @@ export default function EmployeeBalance({ orgAddress }: { orgAddress: `0x${strin
         body: JSON.stringify({
           action: "get_balance",
           employeeAddress: connectedAddress,
+          orgAddress,
         }),
       });
       const data = await res.json();

@@ -37,6 +37,7 @@ export function SalaryCell({
         body: JSON.stringify({
           action: "get_salary",
           employeeAddress,
+          orgAddress,
         }),
       });
 

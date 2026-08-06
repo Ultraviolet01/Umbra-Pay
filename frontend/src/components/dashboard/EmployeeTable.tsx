@@ -66,6 +66,7 @@ export function EmployeeTable({
             body: JSON.stringify({
               action: "get_salary",
               employeeAddress: emp.fullAddress,
+              orgAddress,
             }),
           });
           const data = await res.json();

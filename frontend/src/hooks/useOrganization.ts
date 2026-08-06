@@ -238,7 +238,7 @@ export function useOrganization(orgAddress?: `0x${string}`) {
 
   const fetchEnclaveBalance = useCallback(async () => {
     try {
-      const res = await fetch(`/api/enclave?action=vaultBalance`);
+      const res = await fetch(`/api/enclave?action=vaultBalance&orgAddress=${orgAddress || ""}`);
       const data = await res.json();
       if (data && data.vaultBalanceWei !== undefined) {
         setEnclaveVaultBalance(BigInt(data.vaultBalanceWei));
@@ -246,7 +246,7 @@ export function useOrganization(orgAddress?: `0x${string}`) {
     } catch (e) {
       console.error("Fetch enclave balance error:", e);
     }
-  }, []);
+  }, [orgAddress]);
 
   useEffect(() => {
     fetchEnclaveBalance();

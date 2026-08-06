@@ -31,3 +31,5 @@ yarn-error.log*
 
 # Enclave state (local persistence, do not commit)
 .enclave-state.json
+.umbra-database.json*
+
