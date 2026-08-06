@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
+import fs from "fs";
+import path from "path";
 
 const TEE_PRIVATE_KEY = process.env.TEE_PRIVATE_KEY || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const teeWallet = new ethers.Wallet(TEE_PRIVATE_KEY);
+
+// Persist state to disk so it survives server restarts / hot reloads
+const STATE_FILE = path.join(process.cwd(), ".enclave-state.json");
+
+interface PersistedState {
+  sepoliaVaultBalanceWei: string; // stored as decimal string
+  employeeBalances: Record<string, string>;
+  employeeSalaries: Record<string, string>;
+  payrollRunCount: number;
+}
 
 interface EnclaveState {
   sepoliaVaultBalanceWei: bigint;
@@ -11,24 +23,59 @@ interface EnclaveState {
   payrollRunCount: number;
 }
 
-if (!(globalThis as any).__umbraEnclaveState) {
-  (globalThis as any).__umbraEnclaveState = {
-    sepoliaVaultBalanceWei: ethers.parseEther("0"),
-    employeeBalances: {
-      "0x7a3b4c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f792e": ethers.parseEther("1.5"),
-      "0x1f8c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a41d": ethers.parseEther("2.0"),
-      "0x34934a89ff6bfae149f63b8d587b537d0f308b42": ethers.parseEther("0.1"),
-    },
-    employeeSalaries: {
-      "0x7a3b4c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f792e": ethers.parseEther("1.5"),
-      "0x1f8c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a41d": ethers.parseEther("2.0"),
-      "0x34934a89ff6bfae149f63b8d587b537d0f308b42": ethers.parseEther("0.1"),
-    },
-    payrollRunCount: 1,
+function loadState(): EnclaveState {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      const raw = fs.readFileSync(STATE_FILE, "utf-8");
+      const parsed: PersistedState = JSON.parse(raw);
+      return {
+        sepoliaVaultBalanceWei: BigInt(parsed.sepoliaVaultBalanceWei || "0"),
+        employeeBalances: Object.fromEntries(
+          Object.entries(parsed.employeeBalances || {}).map(([k, v]) => [k, BigInt(v)])
+        ),
+        employeeSalaries: Object.fromEntries(
+          Object.entries(parsed.employeeSalaries || {}).map(([k, v]) => [k, BigInt(v)])
+        ),
+        payrollRunCount: parsed.payrollRunCount || 0,
+      };
+    }
+  } catch (e) {
+    console.error("[Enclave] Failed to load state from disk:", e);
+  }
+  // Default initial state (no seeded mock data)
+  return {
+    sepoliaVaultBalanceWei: BigInt(0),
+    employeeBalances: {},
+    employeeSalaries: {},
+    payrollRunCount: 0,
   };
 }
 
+function saveState(s: EnclaveState) {
+  try {
+    const persisted: PersistedState = {
+      sepoliaVaultBalanceWei: s.sepoliaVaultBalanceWei.toString(),
+      employeeBalances: Object.fromEntries(
+        Object.entries(s.employeeBalances).map(([k, v]) => [k, v.toString()])
+      ),
+      employeeSalaries: Object.fromEntries(
+        Object.entries(s.employeeSalaries).map(([k, v]) => [k, v.toString()])
+      ),
+      payrollRunCount: s.payrollRunCount,
+    };
+    fs.writeFileSync(STATE_FILE, JSON.stringify(persisted, null, 2), "utf-8");
+  } catch (e) {
+    console.error("[Enclave] Failed to persist state:", e);
+  }
+}
+
+// Use globalThis as an in-process cache; load from disk if not yet initialized
+if (!(globalThis as any).__umbraEnclaveState) {
+  (globalThis as any).__umbraEnclaveState = loadState();
+}
+
 const state: EnclaveState = (globalThis as any).__umbraEnclaveState;
+
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -177,6 +224,7 @@ export async function POST(req: Request) {
     if (action === "deposit") {
       const depositWei = ethers.parseEther(depositAmountEth || "0");
       state.sepoliaVaultBalanceWei += depositWei;
+      saveState(state);
       return NextResponse.json({
         success: true,
         vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
@@ -191,6 +239,7 @@ export async function POST(req: Request) {
       if (state.employeeBalances[emp] === undefined) {
         state.employeeBalances[emp] = BigInt(0);
       }
+      saveState(state);
       return NextResponse.json({ success: true, employee: emp, salaryEth: ethers.formatEther(salWei) });
     }
 
@@ -224,6 +273,7 @@ export async function POST(req: Request) {
         state.sepoliaVaultBalanceWei = BigInt(0);
       }
 
+      saveState(state);
       return NextResponse.json({
         success: true,
         payrollRunCount: state.payrollRunCount,
@@ -248,6 +298,7 @@ export async function POST(req: Request) {
 
       state.employeeBalances[emp] -= amountWei;
       state.sepoliaVaultBalanceWei -= amountWei;
+      saveState(state);
 
       const txHash = ethers.keccak256(
         ethers.solidityPacked(
