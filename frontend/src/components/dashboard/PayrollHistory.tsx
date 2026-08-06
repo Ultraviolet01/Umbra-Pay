@@ -37,6 +37,7 @@ export function PayrollHistory({
     employeeCount: number;
   } | null>(null);
 
+  const [localDeposits, setLocalDeposits] = useState<LocalDeposit[]>([]);
   const [enclaveActivity, setEnclaveActivity] = useState<{
     deposits: Array<{ txHash?: string; amountEth: string; timestamp: number }>;
     withdrawals: Array<{ txHash?: string; employeeAddress: string; amountEth: string; timestamp: number }>;

@@ -120,7 +120,7 @@ export default function DashboardListPage() {
 
       // Save payroll schedule for the newly created org
       const newOrgAddr = orgAddresses?.[currentCount - 1];
-      if (newOrgAddr && typeof window !== "undefined") {
+      if (newOrgAddr && typeof newOrgAddr === "string" && typeof window !== "undefined") {
         const key = `drippay_schedule_${newOrgAddr.toLowerCase()}`;
         localStorage.setItem(key, JSON.stringify({
           intervalDays: pendingCycleDays,
