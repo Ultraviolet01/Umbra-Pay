@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance, useSwitchChain } from "wagmi";
 import { parseUnits } from "viem";
 import {
@@ -229,12 +229,37 @@ export function useOrganization(orgAddress?: `0x${string}`) {
     query: { enabled: !!orgAddress },
   });
 
-  const { data: vaultBalanceData, refetch: refetchBalance } = useBalance({
+  const { data: vaultBalanceData, refetch: refetchOnChainBalance } = useBalance({
     address: CONTRACTS.teeVault,
     chainId: 11155111,
   });
 
-  const contractBalance = vaultBalanceData ? vaultBalanceData.value : 0n;
+  const [enclaveVaultBalance, setEnclaveVaultBalance] = useState<bigint | null>(null);
+
+  const fetchEnclaveBalance = useCallback(async () => {
+    if (!orgAddress) return;
+    try {
+      const res = await fetch(`/api/enclave?action=solvency&orgAddress=${orgAddress}`);
+      const data = await res.json();
+      if (data && data.vaultBalanceWei !== undefined) {
+        setEnclaveVaultBalance(BigInt(data.vaultBalanceWei));
+      }
+    } catch (e) {
+      console.error("Fetch enclave balance error:", e);
+    }
+  }, [orgAddress]);
+
+  useEffect(() => {
+    fetchEnclaveBalance();
+  }, [fetchEnclaveBalance]);
+
+  const refetchBalance = useCallback(() => {
+    refetchOnChainBalance();
+    fetchEnclaveBalance();
+  }, [refetchOnChainBalance, fetchEnclaveBalance]);
+
+  const rawOnChainBalance = vaultBalanceData ? vaultBalanceData.value : 0n;
+  const contractBalance = enclaveVaultBalance !== null ? enclaveVaultBalance : rawOnChainBalance;
 
   useEffect(() => {
     if (isRemoveConfirmed && removingAddress) {

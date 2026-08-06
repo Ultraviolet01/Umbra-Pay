@@ -85,6 +85,17 @@ export function UpdateSalaryModal({
         }),
       });
 
+      if (typeof window !== "undefined") {
+        try {
+          const key = `drippay_emp_${orgAddress}_${employeeAddress}`.toLowerCase();
+          const raw = localStorage.getItem(key);
+          const meta = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(key, JSON.stringify({ ...meta, salaryEth: newSalary }));
+        } catch (e) {
+          console.error("Save updated salary error", e);
+        }
+      }
+
       if (chain?.id !== 114 && switchChainAsync) {
         try {
           await switchChainAsync({ chainId: 114 });

@@ -56,20 +56,35 @@ export function EmployeeTable({
       const results: Record<string, string> = {};
 
       for (const emp of employees) {
-        const res = await fetch("/api/enclave", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "get_balance",
-            employeeAddress: emp.fullAddress,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          results[emp.fullAddress.toLowerCase()] = data.balanceEth;
-        } else {
-          results[emp.fullAddress.toLowerCase()] = "0";
+        let sal = emp.salaryEth;
+
+        if (!sal) {
+          try {
+            const key = `drippay_emp_${orgAddress}_${emp.fullAddress}`.toLowerCase();
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const meta = JSON.parse(raw);
+              if (meta?.salaryEth) sal = meta.salaryEth;
+            }
+          } catch {}
         }
+
+        if (!sal) {
+          const res = await fetch("/api/enclave", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "get_salary",
+              employeeAddress: emp.fullAddress,
+            }),
+          });
+          const data = await res.json();
+          if (data.success && data.salaryEth) {
+            sal = data.salaryEth;
+          }
+        }
+
+        results[emp.fullAddress.toLowerCase()] = sal || "0.1";
       }
 
       setRevealedSalaries(results);

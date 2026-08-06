@@ -11,20 +11,24 @@ interface EnclaveState {
   payrollRunCount: number;
 }
 
-const state: EnclaveState = {
-  sepoliaVaultBalanceWei: ethers.parseEther("0"),
-  employeeBalances: {
-    "0x7a3b4c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f792e": ethers.parseEther("1.5"),
-    "0x1f8c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a41d": ethers.parseEther("2.0"),
-    "0x34934a89ff6bfae149f63b8d587b537d0f308b42": ethers.parseEther("0.1"),
-  },
-  employeeSalaries: {
-    "0x7a3b4c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f792e": ethers.parseEther("1.5"),
-    "0x1f8c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a41d": ethers.parseEther("2.0"),
-    "0x34934a89ff6bfae149f63b8d587b537d0f308b42": ethers.parseEther("0.1"),
-  },
-  payrollRunCount: 1,
-};
+if (!(globalThis as any).__umbraEnclaveState) {
+  (globalThis as any).__umbraEnclaveState = {
+    sepoliaVaultBalanceWei: ethers.parseEther("0"),
+    employeeBalances: {
+      "0x7a3b4c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f792e": ethers.parseEther("1.5"),
+      "0x1f8c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a41d": ethers.parseEther("2.0"),
+      "0x34934a89ff6bfae149f63b8d587b537d0f308b42": ethers.parseEther("0.1"),
+    },
+    employeeSalaries: {
+      "0x7a3b4c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f792e": ethers.parseEther("1.5"),
+      "0x1f8c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a41d": ethers.parseEther("2.0"),
+      "0x34934a89ff6bfae149f63b8d587b537d0f308b42": ethers.parseEther("0.1"),
+    },
+    payrollRunCount: 1,
+  };
+}
+
+const state: EnclaveState = (globalThis as any).__umbraEnclaveState;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -48,12 +52,7 @@ export async function GET(req: Request) {
       }
 
       let balWei = state.employeeBalances[address];
-      if ((balWei === undefined || balWei === BigInt(0)) && state.payrollRunCount > 0) {
-        const sal = state.employeeSalaries[address] || ethers.parseEther("0.1");
-        state.employeeSalaries[address] = sal;
-        state.employeeBalances[address] = sal * BigInt(state.payrollRunCount);
-        balWei = state.employeeBalances[address];
-      } else if (balWei === undefined) {
+      if (balWei === undefined) {
         balWei = BigInt(0);
       }
 
@@ -122,16 +121,23 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { action, employeeAddress, amountEth, salaryEth, sepoliaRecipient, depositAmountEth, employees } = body;
 
+    if (action === "get_salary") {
+      const emp = (employeeAddress || "").toLowerCase();
+      const salWei = state.employeeSalaries[emp] || ethers.parseEther("0.1");
+      return NextResponse.json({
+        success: true,
+        employeeAddress: emp,
+        salaryEth: ethers.formatEther(salWei),
+        salaryWei: salWei.toString(),
+      });
+    }
+
     if (action === "get_balance") {
       const emp = (employeeAddress || "").toLowerCase();
       let balWei = state.employeeBalances[emp];
+      const salWei = state.employeeSalaries[emp] || ethers.parseEther("0.1");
 
-      if ((balWei === undefined || balWei === BigInt(0)) && state.payrollRunCount > 0) {
-        const sal = state.employeeSalaries[emp] || ethers.parseEther("0.1");
-        state.employeeSalaries[emp] = sal;
-        state.employeeBalances[emp] = sal * BigInt(state.payrollRunCount);
-        balWei = state.employeeBalances[emp];
-      } else if (balWei === undefined) {
+      if (balWei === undefined) {
         balWei = BigInt(0);
       }
 
@@ -139,6 +145,7 @@ export async function POST(req: Request) {
         success: true,
         employeeAddress: emp,
         balanceEth: ethers.formatEther(balWei),
+        salaryEth: ethers.formatEther(salWei),
       });
     }
 
@@ -148,6 +155,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         vaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
+        vaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
       });
     }
 
@@ -158,12 +166,14 @@ export async function POST(req: Request) {
       if (state.employeeBalances[emp] === undefined) {
         state.employeeBalances[emp] = BigInt(0);
       }
-      return NextResponse.json({ success: true, employee: emp });
+      return NextResponse.json({ success: true, employee: emp, salaryEth: ethers.formatEther(salWei) });
     }
 
     if (action === "run_payroll") {
       state.payrollRunCount++;
       const empList = Array.isArray(employees) ? employees : [];
+
+      let totalRunCostWei = BigInt(0);
 
       if (empList.length > 0) {
         for (const empObj of empList) {
@@ -173,17 +183,29 @@ export async function POST(req: Request) {
           const salWei = ethers.parseEther(salEth);
           state.employeeSalaries[empAddr] = salWei;
           state.employeeBalances[empAddr] = (state.employeeBalances[empAddr] || BigInt(0)) + salWei;
+          totalRunCostWei += salWei;
         }
       } else {
         for (const emp of Object.keys(state.employeeSalaries)) {
           const sal = state.employeeSalaries[emp];
           state.employeeBalances[emp] = (state.employeeBalances[emp] || BigInt(0)) + sal;
+          totalRunCostWei += sal;
         }
+      }
+
+      if (state.sepoliaVaultBalanceWei >= totalRunCostWei) {
+        state.sepoliaVaultBalanceWei -= totalRunCostWei;
+      } else {
+        state.sepoliaVaultBalanceWei = BigInt(0);
       }
 
       return NextResponse.json({
         success: true,
         payrollRunCount: state.payrollRunCount,
+        executedCostWei: totalRunCostWei.toString(),
+        executedCostEth: ethers.formatEther(totalRunCostWei),
+        remainingVaultBalanceEth: ethers.formatEther(state.sepoliaVaultBalanceWei),
+        remainingVaultBalanceWei: state.sepoliaVaultBalanceWei.toString(),
       });
     }
 

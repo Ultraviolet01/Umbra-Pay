@@ -32,7 +32,7 @@ function createEmptyRow(): EmployeeRow {
 
 interface AddEmployeeModalProps {
   onClose: () => void;
-  onAddEmployee: (infos?: { wallet: string; name: string; role: string }[]) => void;
+  onAddEmployee: (infos?: { wallet: string; name: string; role: string; salaryEth: string }[]) => void;
   orgAddress: `0x${string}`;
   existingAddresses?: `0x${string}`[];
   existingCount?: number;
@@ -69,6 +69,7 @@ export function AddEmployeeModal({
         wallet: r.wallet.trim(),
         name: r.name.trim() || `${r.wallet.trim().slice(0, 6)}...${r.wallet.trim().slice(-4)}`,
         role: r.role.trim() || "Employee",
+        salaryEth: r.salary.trim() || "0.1",
       }));
       setTimeout(() => onAddEmployee(infos), 1500);
     }

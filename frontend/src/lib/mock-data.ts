@@ -116,6 +116,7 @@ export interface Employee {
   role: string;
   status: string;
   lastPaid: string;
+  salaryEth?: string;
 }
 
 export const mockEmployees: Employee[] = [

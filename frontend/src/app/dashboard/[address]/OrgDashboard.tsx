@@ -69,10 +69,11 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
     } catch { return null; }
   };
 
-  const saveEmployeeMeta = (empAddr: string, meta: { name: string; role: string }) => {
+  const saveEmployeeMeta = (empAddr: string, meta: { name: string; role: string; salaryEth?: string }) => {
     if (typeof window === "undefined") return;
     const key = `drippay_emp_${orgAddress}_${empAddr}`.toLowerCase();
-    localStorage.setItem(key, JSON.stringify(meta));
+    const existing = getEmployeeMeta(empAddr) || {};
+    localStorage.setItem(key, JSON.stringify({ ...existing, ...meta }));
   };
 
   const lastPayrollTimestampSec = payrollEvents.length > 0
@@ -96,6 +97,7 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
       fullAddress: addr,
       role: meta?.role || "Employee",
       status: "active",
+      salaryEth: meta?.salaryEth || "0.1",
       lastPaid: lastPayrollTimestamp || "—",
     };
   });
@@ -293,10 +295,12 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
                   saveEmployeeMeta(info.wallet, {
                     name: info.name,
                     role: info.role,
+                    salaryEth: info.salaryEth,
                   });
                 }
               }
               refetchEmployees();
+              refetchBalance();
               setShowAddEmployee(false);
             }}
             orgAddress={orgAddress}
@@ -315,6 +319,8 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
             onSuccess={() => {
               setShowUpdateSalary(null);
               setSalaryVersion((v) => v + 1);
+              refetchEmployees();
+              refetchBalance();
             }}
             orgAddress={orgAddress}
             employeeAddress={showUpdateSalary.address}
@@ -331,6 +337,7 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
             onClose={() => setShowPayrollConfirm(false)}
             onExecute={() => {
               refetchEmployees();
+              refetchBalance();
             }}
             orgAddress={orgAddress}
             employees={employees}

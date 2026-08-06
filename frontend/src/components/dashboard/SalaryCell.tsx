@@ -12,6 +12,7 @@ interface SalaryCellProps {
 
 export function SalaryCell({
   employeeAddress,
+  orgAddress,
   compact = false,
 }: SalaryCellProps) {
   const [revealed, setRevealed] = useState(false);
@@ -34,16 +35,28 @@ export function SalaryCell({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "get_balance",
+          action: "get_salary",
           employeeAddress,
         }),
       });
 
       const data = await res.json();
-      if (data.success) {
-        setSalary(data.balanceEth);
+      if (data.success && data.salaryEth) {
+        setSalary(data.salaryEth);
         setRevealed(true);
       } else {
+        try {
+          const key = `drippay_emp_${orgAddress}_${employeeAddress}`.toLowerCase();
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const meta = JSON.parse(raw);
+            if (meta?.salaryEth) {
+              setSalary(meta.salaryEth);
+              setRevealed(true);
+              return;
+            }
+          }
+        } catch {}
         setError(data.error || "Query failed");
       }
     } catch (err: unknown) {

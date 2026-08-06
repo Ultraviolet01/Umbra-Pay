@@ -47,7 +47,7 @@ export function PayrollConfirmModal({
         body: JSON.stringify({
           action: "run_payroll",
           employees: activeEmployees.map((e) => ({
-            address: e.address,
+            address: e.fullAddress || e.address,
             salaryEth: e.salaryEth || "0.1",
           })),
         }),
