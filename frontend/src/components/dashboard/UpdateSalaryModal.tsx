@@ -82,6 +82,7 @@ export function UpdateSalaryModal({
           action: "add_employee",
           employeeAddress,
           salaryEth: newSalary,
+          orgAddress,
         }),
       });
 

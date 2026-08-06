@@ -183,6 +183,7 @@ export function useOrganization(orgAddress?: `0x${string}`) {
       body: JSON.stringify({
         action: "deposit",
         depositAmountEth: amountEth,
+        orgAddress,
       }),
     });
   };

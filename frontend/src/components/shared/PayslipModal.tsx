@@ -60,6 +60,7 @@ export function PayslipModal({
         body: JSON.stringify({
           action: "get_balance",
           employeeAddress,
+          orgAddress,
         }),
       });
 

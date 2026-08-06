@@ -137,6 +137,7 @@ export function AddEmployeeModal({
             action: "add_employee",
             employeeAddress: addr,
             salaryEth: row.salary,
+            orgAddress,
           }),
         });
       }
