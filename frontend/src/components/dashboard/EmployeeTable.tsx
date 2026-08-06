@@ -34,7 +34,7 @@ export function EmployeeTable({
 
   const [revealedSalaries, setRevealedSalaries] = useState<Record<string, string>>({});
   const [isRevealing, setIsRevealing] = useState(false);
-  const allRevealed = employees.length > 0 && employees.every((emp) => revealedSalaries[emp.fullAddress.toLowerCase()]);
+  const allRevealed = employees.length > 0 && employees.every((emp) => revealedSalaries[emp.fullAddress.toLowerCase()] !== undefined);
 
   useEffect(() => {
     if (salaryVersion > 0) {
@@ -56,20 +56,10 @@ export function EmployeeTable({
       const results: Record<string, string> = {};
 
       for (const emp of employees) {
-        let sal = emp.salaryEth;
+        // Always query the enclave for the authoritative salary value
+        let sal: string | undefined;
 
-        if (!sal) {
-          try {
-            const key = `drippay_emp_${orgAddress}_${emp.fullAddress}`.toLowerCase();
-            const raw = localStorage.getItem(key);
-            if (raw) {
-              const meta = JSON.parse(raw);
-              if (meta?.salaryEth) sal = meta.salaryEth;
-            }
-          } catch {}
-        }
-
-        if (!sal) {
+        try {
           const res = await fetch("/api/enclave", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -79,12 +69,31 @@ export function EmployeeTable({
             }),
           });
           const data = await res.json();
-          if (data.success && data.salaryEth) {
+          if (data.success && data.salaryEth && parseFloat(data.salaryEth) > 0) {
             sal = data.salaryEth;
+          }
+        } catch {}
+
+        // Fallback 1: emp.salaryEth (from OrgDashboard state / localStorage)
+        if (!sal || parseFloat(sal) === 0) {
+          if (emp.salaryEth && parseFloat(emp.salaryEth) > 0) {
+            sal = emp.salaryEth;
           }
         }
 
-        results[emp.fullAddress.toLowerCase()] = sal || "0.1";
+        // Fallback 2: localStorage meta directly
+        if (!sal || parseFloat(sal) === 0) {
+          try {
+            const key = `drippay_emp_${orgAddress}_${emp.fullAddress}`.toLowerCase();
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const meta = JSON.parse(raw);
+              if (meta?.salaryEth && parseFloat(meta.salaryEth) > 0) sal = meta.salaryEth;
+            }
+          } catch {}
+        }
+
+        results[emp.fullAddress.toLowerCase()] = sal && parseFloat(sal) > 0 ? sal : "—";
       }
 
       setRevealedSalaries(results);
@@ -246,7 +255,7 @@ export function EmployeeTable({
 function SalaryDisplay({ salary, tokenSymbol, compact }: { salary?: string; tokenSymbol: string; compact?: boolean }) {
   return (
     <AnimatePresence mode="wait">
-      {salary ? (
+      {salary !== undefined ? (
         <motion.div
           key="revealed"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -256,6 +265,8 @@ function SalaryDisplay({ salary, tokenSymbol, compact }: { salary?: string; toke
         >
           {salary === "Error" ? (
             <span className={`${compact ? "text-[11px]" : "text-sm"} text-red-400`}>Failed</span>
+          ) : salary === "—" ? (
+            <span className={`${compact ? "text-[11px]" : "text-sm"} text-[var(--text-muted)] italic`}>Not set</span>
           ) : (
             <>
               <span className={`font-mono font-semibold text-[var(--accent)] ${compact ? "text-[11px]" : "text-sm"}`}>
