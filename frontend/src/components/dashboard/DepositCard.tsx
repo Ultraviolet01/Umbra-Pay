@@ -80,7 +80,6 @@ export function DepositCard({
     if (isTxConfirmed && txHash) {
       setIsSuccess(true);
       setErrorMessage("");
-      refetchBalance?.();
 
       if (typeof window !== "undefined") {
         const key = `drippay_deposits_${orgAddress || "all"}`.toLowerCase();
@@ -99,6 +98,7 @@ export function DepositCard({
         }
       }
 
+      // Sync enclave first, then refetch balance so UI reflects the new amount
       fetch("/api/enclave", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -106,7 +106,14 @@ export function DepositCard({
           action: "deposit",
           depositAmountEth: depositedAmount || amount,
         }),
-      }).catch((e) => console.error("Enclave sync error", e));
+      })
+        .then(() => {
+          refetchBalance?.();
+        })
+        .catch((e) => {
+          console.error("Enclave sync error", e);
+          refetchBalance?.();
+        });
 
       const timer = setTimeout(() => {
         setIsSuccess(false);
@@ -116,7 +123,7 @@ export function DepositCard({
 
       return () => clearTimeout(timer);
     }
-  }, [isTxConfirmed, txHash, depositedAmount, amount, resetSend]);
+  }, [isTxConfirmed, txHash, depositedAmount, amount, resetSend, refetchBalance, orgAddress]);
 
   const shortTx = txHash ? `${txHash.slice(0, 6)}...${txHash.slice(-4)}` : "";
   const isBusy = isSendPending || isWaitingTx;
