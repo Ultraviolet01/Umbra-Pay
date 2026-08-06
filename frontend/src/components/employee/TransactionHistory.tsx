@@ -43,6 +43,33 @@ export function TransactionHistory({
     employeeCount: number;
   } | null>(null);
 
+  const [enclaveActivity, setEnclaveActivity] = useState<{
+    deposits: Array<{ txHash?: string; amountEth: string; timestamp: number }>;
+    withdrawals: Array<{ txHash?: string; employeeAddress: string; amountEth: string; timestamp: number }>;
+    payrollHistory: Array<{ runId: number; executedCostEth: string; employeeCount: number; timestamp: number }>;
+  }>({ deposits: [], withdrawals: [], payrollHistory: [] });
+
+  useEffect(() => {
+    async function fetchEnclaveActivity() {
+      try {
+        const res = await fetch(`/api/enclave?action=activity&orgAddress=${orgAddress || ""}`);
+        const data = await res.json();
+        if (data && data.success) {
+          setEnclaveActivity({
+            deposits: data.deposits || [],
+            withdrawals: data.withdrawals || [],
+            payrollHistory: data.payrollHistory || [],
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch enclave activity for employee", e);
+      }
+    }
+    fetchEnclaveActivity();
+    const interval = setInterval(fetchEnclaveActivity, 4000);
+    return () => clearInterval(interval);
+  }, [orgAddress]);
+
   const { events: withdrawalEvents, isLoading: loadingWithdrawals } =
     useContractEvents({
       address: orgAddress,
@@ -60,10 +87,34 @@ export function TransactionHistory({
       enabled: !!orgAddress,
     });
 
+  // Enclave items for this employee
+  const myAddress = (address || "").toLowerCase();
+  const enclaveWithdrawals = enclaveActivity.withdrawals
+    .filter((w) => !myAddress || w.employeeAddress.toLowerCase() === myAddress)
+    .map((w, i) => ({
+      _type: "withdrawal" as const,
+      blockNumber: BigInt(99999000 - i),
+      transactionHash: w.txHash || "",
+      args: { amount: formatUnits(BigInt(0), 18) }, // mock for viem compatibility
+      isEnclave: true,
+      amountEth: w.amountEth,
+    }));
+
+  const enclavePayrollRuns = enclaveActivity.payrollHistory.map((p, i) => ({
+    _type: "payroll" as const,
+    blockNumber: BigInt(99998000 - i),
+    transactionHash: `run-${p.runId}`,
+    args: { employeeCount: p.employeeCount },
+    isEnclave: true,
+    amountEth: p.executedCostEth,
+  }));
+
   // Merge and sort by block number (newest first)
   const allEvents = [
-    ...withdrawalEvents.map((e) => ({ ...e, _type: "withdrawal" as const })),
-    ...payrollEvents.map((e) => ({ ...e, _type: "payroll" as const })),
+    ...enclaveWithdrawals,
+    ...enclavePayrollRuns,
+    ...withdrawalEvents.map((e) => ({ ...e, _type: "withdrawal" as const, isEnclave: false, amountEth: undefined })),
+    ...payrollEvents.map((e) => ({ ...e, _type: "payroll" as const, isEnclave: false, amountEth: undefined })),
   ].sort((a, b) =>
     Number((b.blockNumber ?? BigInt(0)) - (a.blockNumber ?? BigInt(0))),
   );
@@ -176,8 +227,10 @@ export function TransactionHistory({
                       </p>
                       <div className="flex items-center gap-1 text-[11px] sm:text-xs text-[var(--text-muted)] truncate">
                         {isWithdrawal
-                          ? `−${formatUnits(args.amount ?? BigInt(0), tokenDecimals)} ${tokenSymbol}`
-                          : `${args.employeeCount?.toString() ?? "?"} employees paid`}
+                          ? `−${evt.amountEth || formatUnits(args?.amount ?? BigInt(0), tokenDecimals)} ${tokenSymbol}`
+                          : evt.amountEth
+                          ? `${evt.amountEth} ${tokenSymbol} disbursed`
+                          : `${args?.employeeCount?.toString() ?? "?"} employees paid`}
                         {txHash && (
                           <>
                             <span className="mx-1">·</span>

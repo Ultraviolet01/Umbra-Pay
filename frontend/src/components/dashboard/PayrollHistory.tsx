@@ -37,7 +37,33 @@ export function PayrollHistory({
     employeeCount: number;
   } | null>(null);
 
-  const [localDeposits, setLocalDeposits] = useState<LocalDeposit[]>([]);
+  const [enclaveActivity, setEnclaveActivity] = useState<{
+    deposits: Array<{ txHash?: string; amountEth: string; timestamp: number }>;
+    withdrawals: Array<{ txHash?: string; employeeAddress: string; amountEth: string; timestamp: number }>;
+    payrollHistory: Array<{ runId: number; executedCostEth: string; employeeCount: number; timestamp: number }>;
+  }>({ deposits: [], withdrawals: [], payrollHistory: [] });
+
+  const fetchEnclaveActivity = async () => {
+    try {
+      const res = await fetch(`/api/enclave?action=activity&orgAddress=${orgAddress || ""}`);
+      const data = await res.json();
+      if (data && data.success) {
+        setEnclaveActivity({
+          deposits: data.deposits || [],
+          withdrawals: data.withdrawals || [],
+          payrollHistory: data.payrollHistory || [],
+        });
+      }
+    } catch (e) {
+      console.error("Failed to fetch enclave activity", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchEnclaveActivity();
+    const interval = setInterval(fetchEnclaveActivity, 4000);
+    return () => clearInterval(interval);
+  }, [orgAddress]);
 
   const { events: payrollEvents, isLoading: loadingPayroll } = useContractEvents({
     address: orgAddress,
@@ -87,8 +113,30 @@ export function PayrollHistory({
     return () => window.removeEventListener("drippay_deposit_added", loadLocalDeposits);
   }, [orgAddress]);
 
-  // Merge contract events & local deposits, sorted newest first
+  // Merge contract events, enclave database activities & local deposits
+  const enclavePayrollEvents = enclaveActivity.payrollHistory.map((p, i) => ({
+    _type: "enclave_payroll" as const,
+    blockNumber: BigInt(99999000 - i),
+    txHash: `run-${p.runId}`,
+    label: `Payroll Run #${p.runId} (TEE)`,
+    details: `${p.employeeCount} employees · ${p.executedCostEth} ${tokenSymbol}`,
+    explorerUrl: "#",
+    isPayroll: true,
+    rawEvent: { args: { employeeCount: p.employeeCount } },
+  }));
+
+  const enclaveDepositEvents = enclaveActivity.deposits.map((d, i) => ({
+    _type: "enclave_deposit" as const,
+    blockNumber: BigInt(99998000 - i),
+    txHash: d.txHash || "",
+    label: "Deposit (TEE Vault)",
+    details: `${d.amountEth} ${tokenSymbol}`,
+    explorerUrl: d.txHash ? `${SEPOLIA_EXPLORER_URL}/${d.txHash}` : "#",
+    isPayroll: false,
+  }));
+
   const allEvents = [
+    ...enclavePayrollEvents,
     ...payrollEvents.map((e) => ({
       _type: "payroll" as const,
       blockNumber: e.blockNumber ?? BigInt(0),
@@ -99,6 +147,7 @@ export function PayrollHistory({
       isPayroll: true,
       rawEvent: e,
     })),
+    ...enclaveDepositEvents,
     ...depositEvents.map((e) => ({
       _type: "deposit" as const,
       blockNumber: e.blockNumber ?? BigInt(0),
@@ -110,7 +159,7 @@ export function PayrollHistory({
     })),
     ...localDeposits.map((d, i) => ({
       _type: "local_deposit" as const,
-      blockNumber: BigInt(99999999 - i),
+      blockNumber: BigInt(99997000 - i),
       txHash: d.txHash,
       label: "Deposit (TEE Vault)",
       details: `${d.amountEth} ${tokenSymbol}`,

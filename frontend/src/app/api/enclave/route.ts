@@ -108,6 +108,15 @@ export async function GET(req: Request) {
     }
   }
 
+  if (action === "activity") {
+    return NextResponse.json({
+      success: true,
+      deposits: org.deposits || [],
+      withdrawals: org.withdrawals || [],
+      payrollHistory: org.payrollHistory || [],
+    });
+  }
+
   return NextResponse.json({
     status: "online",
     enclaveAddress: teeWallet.address,
