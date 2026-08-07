@@ -259,13 +259,10 @@ export async function POST(req: Request) {
       const amountWei = ethers.parseEther(amountEth || "0");
 
       const curEmpBalWei = BigInt(org.employeeBalances[emp] || "0");
-      if (curEmpBalWei < amountWei) {
-        return NextResponse.json({ error: "Insufficient enclave balance" }, { status: 400 });
-      }
-
       const curVaultWei = BigInt(org.vaultBalanceWei || "0");
-      if (curVaultWei < amountWei) {
-        return NextResponse.json({ error: "Insufficient Sepolia Vault ETH liquidity" }, { status: 400 });
+
+      if (curEmpBalWei < amountWei && curVaultWei < amountWei) {
+        return NextResponse.json({ error: "Insufficient enclave balance or vault liquidity" }, { status: 400 });
       }
 
       const txHash = ethers.keccak256(
@@ -278,8 +275,8 @@ export async function POST(req: Request) {
       const updatedOrg = updateOrg(orgAddress, (state) => {
         const ebWei = BigInt(state.employeeBalances[emp] || "0");
         const vbWei = BigInt(state.vaultBalanceWei || "0");
-        state.employeeBalances[emp] = (ebWei - amountWei).toString();
-        state.vaultBalanceWei = (vbWei - amountWei).toString();
+        state.employeeBalances[emp] = ebWei >= amountWei ? (ebWei - amountWei).toString() : "0";
+        state.vaultBalanceWei = vbWei >= amountWei ? (vbWei - amountWei).toString() : "0";
 
         state.withdrawals.unshift({
           txHash,
