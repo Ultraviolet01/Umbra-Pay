@@ -1,8 +1,12 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { ethers } from "ethers";
 
-const DB_FILE = path.join(process.cwd(), ".umbra-database.json");
+// On Vercel / serverless, process.cwd() is read-only (/var/task). /tmp is writable.
+const DB_FILE = process.env.VERCEL || process.env.NODE_ENV === "production"
+  ? path.join(os.tmpdir(), ".umbra-database.json")
+  : path.join(process.cwd(), ".umbra-database.json");
 
 export interface DepositRecord {
   txHash?: string;
@@ -66,6 +70,18 @@ function loadDatabaseFromDisk(): DatabaseSchema {
     console.error("[Enclave DB] Error reading database file:", err);
   }
 
+  // Check fallback in current working dir if DB_FILE was /tmp
+  try {
+    const cwdFile = path.join(process.cwd(), ".umbra-database.json");
+    if (cwdFile !== DB_FILE && fs.existsSync(cwdFile)) {
+      const raw = fs.readFileSync(cwdFile, "utf-8");
+      const db: DatabaseSchema = JSON.parse(raw);
+      if (db && db.organizations) {
+        return db;
+      }
+    }
+  } catch {}
+
   // Also check old state file for backward compatibility migration
   const oldStateFile = path.join(process.cwd(), ".enclave-state.json");
   let defaultVault = "0";
@@ -104,6 +120,10 @@ function loadDatabaseFromDisk(): DatabaseSchema {
 
 function saveDatabaseToDisk(db: DatabaseSchema) {
   try {
+    const dir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     const tmpFile = `${DB_FILE}.tmp`;
     fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2), "utf-8");
     fs.renameSync(tmpFile, DB_FILE);
@@ -113,7 +133,6 @@ function saveDatabaseToDisk(db: DatabaseSchema) {
 }
 
 function getDatabase(): DatabaseSchema {
-  // Always load from memory cache if present, but allow disk re-read
   if (!(globalThis as any).__umbraDatabase) {
     (globalThis as any).__umbraDatabase = loadDatabaseFromDisk();
   }

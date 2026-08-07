@@ -70,7 +70,7 @@ export function EmployeeTable({
             }),
           });
           const data = await res.json();
-          if (data.success && data.salaryEth && parseFloat(data.salaryEth) > 0) {
+          if (data.success && data.found && data.salaryEth && parseFloat(data.salaryEth) > 0) {
             sal = data.salaryEth;
           }
         } catch {}

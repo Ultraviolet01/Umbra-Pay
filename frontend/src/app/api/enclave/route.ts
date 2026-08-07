@@ -133,26 +133,36 @@ export async function POST(req: Request) {
 
     if (action === "get_salary") {
       const emp = (employeeAddress || "").toLowerCase();
-      const salStr = org.employeeSalaries[emp] || "100000000000000000"; // 0.1 ETH default
-      const salWei = BigInt(salStr);
+      const salStr = org.employeeSalaries[emp];
+      if (salStr) {
+        const salWei = BigInt(salStr);
+        return NextResponse.json({
+          success: true,
+          found: true,
+          employeeAddress: emp,
+          salaryEth: ethers.formatEther(salWei),
+          salaryWei: salWei.toString(),
+        });
+      }
       return NextResponse.json({
         success: true,
+        found: false,
         employeeAddress: emp,
-        salaryEth: ethers.formatEther(salWei),
-        salaryWei: salWei.toString(),
+        salaryEth: null,
       });
     }
 
     if (action === "get_balance") {
       const emp = (employeeAddress || "").toLowerCase();
       const balWei = BigInt(org.employeeBalances[emp] || "0");
-      const salWei = BigInt(org.employeeSalaries[emp] || "100000000000000000");
+      const salStr = org.employeeSalaries[emp];
+      const salWei = salStr ? BigInt(salStr) : BigInt(0);
 
       return NextResponse.json({
         success: true,
         employeeAddress: emp,
         balanceEth: ethers.formatEther(balWei),
-        salaryEth: ethers.formatEther(salWei),
+        salaryEth: salStr ? ethers.formatEther(salWei) : null,
       });
     }
 
