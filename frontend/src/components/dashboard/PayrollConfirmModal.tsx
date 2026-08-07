@@ -46,6 +46,7 @@ export function PayrollConfirmModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "run_payroll",
+          orgAddress,
           employees: activeEmployees.map((e) => ({
             address: e.fullAddress || e.address,
             salaryEth: e.salaryEth || "0.1",

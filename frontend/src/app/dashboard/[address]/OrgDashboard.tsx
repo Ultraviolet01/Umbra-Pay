@@ -88,7 +88,28 @@ export default function OrgDashboard({ address: orgAddress }: { address: `0x${st
     ? new Date(lastPayrollTimestampSec * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : null;
 
-  const employees: Employee[] = (contractEmployees ?? []).map((addr, i) => {
+  const getCombinedEmployeeAddresses = (): string[] => {
+    const addressesSet = new Set<string>();
+    (contractEmployees ?? []).forEach((a) => addressesSet.add(a.toLowerCase()));
+
+    if (typeof window !== "undefined") {
+      const prefix = `drippay_emp_${orgAddress}_`.toLowerCase();
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.toLowerCase().startsWith(prefix)) {
+          const empAddr = k.substring(prefix.length);
+          if (empAddr && /^0x[0-9a-f]{40}$/i.test(empAddr)) {
+            addressesSet.add(empAddr.toLowerCase());
+          }
+        }
+      }
+    }
+    return Array.from(addressesSet);
+  };
+
+  const combinedAddresses = getCombinedEmployeeAddresses();
+
+  const employees: Employee[] = combinedAddresses.map((addr, i) => {
     const meta = getEmployeeMeta(addr);
     return {
       id: i + 1,
