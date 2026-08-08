@@ -134,6 +134,17 @@ Employer                          Coston2 / TEE Enclave                   Employ
 
 ---
 
+## Roadmap
+
+Umbra Pay is expanding multi-chain confidential payroll settlement capabilities to support additional high-throughput networks:
+
+- **XRP Network (XRPL / XRPL EVM)** — Priority integration for confidential cross-border payroll settlement.
+- **BNB Chain** — Ultra-low fee multi-asset payroll distribution.
+- **Arbitrum Network** — High-efficiency Ethereum L2 privacy & settlement scaling.
+- **Base Network** — Seamless L2 ecosystem integration and onboarding.
+
+---
+
 ## Quickstart
 
 ### Prerequisites
